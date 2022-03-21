@@ -1,6 +1,5 @@
 use crate::storable::Storable;
 use crate::util;
-use crate::util::Digest;
 use colour_eyre::eyre::ContextCompat;
 
 use flate2::write::ZlibEncoder;
@@ -23,13 +22,13 @@ impl Database {
         }
     }
 
-    pub fn store(&self, obj: impl Storable) -> Result<()> {
-        let formatted = obj.format();
-        let oid = obj.get_oid();
-        self.write_object(oid, &formatted)
+    pub fn store(&self, obj: &impl Storable) -> Result<()> {
+        self.write_object(obj)
     }
 
-    fn write_object(&self, oid: &Digest, content: &[u8]) -> Result<()> {
+    fn write_object(&self, obj: &impl Storable) -> Result<()> {
+        let content = obj.format();
+        let oid = obj.get_oid();
         let oid_string: String = oid.encode_hex();
         let object_path = {
             let mut p = self.path.to_owned();

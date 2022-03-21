@@ -7,12 +7,11 @@ mod util;
 
 extern crate color_eyre as colour_eyre;
 
-use std::ffi::OsStr;
 use std::path::Path;
 use std::path::PathBuf;
 
-
 use crate::storable::Blob;
+use crate::storable::Storable;
 use clap::Parser;
 pub use colour_eyre::Result;
 use once_cell::sync::Lazy;
@@ -48,13 +47,12 @@ fn commit() -> Result<()> {
     let git_path = ROOT.join(".git");
     let db_path = git_path.join("objects");
     let wsp = Workspace::new(ROOT.as_path());
-    println!("{:?}", wsp.list_files()?);
     let database = database::Database::new(db_path);
     for file in wsp.list_files()? {
         let filepath = ROOT.join(file);
         let data = std::fs::read(filepath)?;
-        let blob = Blob::new(data);
-        database.store(blob)?;
+        let blob = Blob::new(&data);
+        database.store(&blob)?;
     }
     Ok(())
 }
@@ -72,16 +70,21 @@ impl Workspace {
         }
     }
 
-    fn list_files(&self) -> Result<Vec<String>> {
-        let mut out = Vec::new();
-        for p in self.path.read_dir()? {
-            let p = p?;
-            let filename = p.file_name();
-            if Self::IGNORE.map(OsStr::new).contains(&filename.as_os_str()) {
-                continue;
+    fn list_files(&self) -> Result<impl Iterator<Item = String>> {
+        Ok(self.path.read_dir()?.filter_map(|x| {
+            let x = x.ok()?;
+
+            // TODO proper error handling
+            let filename = match x.file_name().into_string() {
+                Ok(x) => x,
+                Err(e) => panic!("non-utf8 path name waa {:?}", e),
+            };
+
+            if Self::IGNORE.contains(&&*filename) {
+                None
+            } else {
+                Some(filename)
             }
-            out.push(p.file_name().to_string_lossy().into_owned());
-        }
-        Ok(out)
+        }))
     }
 }
