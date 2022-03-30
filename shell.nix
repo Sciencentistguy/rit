@@ -4,5 +4,8 @@ pkgs.mkShell {
   nativeBuildInputs = with pkgs; [
     llvmPackages.clang
     rustup
+    cargo-nextest
+    cargo-edit
+    git
   ];
 }

@@ -47,7 +47,7 @@ impl Database {
 
         let mut file = std::fs::File::create(&temp_path)?;
 
-        let mut e = ZlibEncoder::new(Vec::with_capacity(content.len()), Compression::default());
+        let mut e = ZlibEncoder::new(Vec::with_capacity(content.len()), Compression::fast());
         e.write_all(content)?;
         let compressed_bytes = e.finish()?;
 

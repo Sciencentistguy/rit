@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use crate::Result;
+use std::path::{Path, PathBuf};
 
 pub struct Workspace {
     path: PathBuf,
