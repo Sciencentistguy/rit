@@ -1,6 +1,6 @@
 use crate::storable::Storable;
 use crate::util;
-use colour_eyre::eyre::ContextCompat;
+use color_eyre::eyre::ContextCompat;
 
 use flate2::write::ZlibEncoder;
 use flate2::Compression;

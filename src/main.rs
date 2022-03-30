@@ -4,19 +4,19 @@ mod database;
 mod interface;
 mod storable;
 mod util;
+mod workspace;
 
-extern crate color_eyre as colour_eyre;
+pub use color_eyre::Result;
 
-use std::path::Path;
 use std::path::PathBuf;
 
+use crate::interface::*;
 use crate::storable::Blob;
 use crate::storable::Storable;
-use clap::Parser;
-pub use colour_eyre::Result;
-use once_cell::sync::Lazy;
+use crate::workspace::Workspace;
 
-use interface::*;
+use clap::Parser;
+use once_cell::sync::Lazy;
 
 static ARGS: Lazy<Opt> = Lazy::new(Opt::parse);
 static ROOT: Lazy<PathBuf> = Lazy::new(|| match &ARGS.path {
@@ -25,7 +25,7 @@ static ROOT: Lazy<PathBuf> = Lazy::new(|| match &ARGS.path {
 });
 
 fn main() -> Result<()> {
-    colour_eyre::install().unwrap();
+    color_eyre::install().unwrap();
     Lazy::force(&ARGS);
 
     match ARGS.command {
@@ -55,36 +55,4 @@ fn commit() -> Result<()> {
         database.store(&blob)?;
     }
     Ok(())
-}
-
-struct Workspace {
-    path: PathBuf,
-}
-
-impl Workspace {
-    const IGNORE: [&'static str; 1] = [".git"];
-
-    fn new(path: impl AsRef<Path>) -> Self {
-        Self {
-            path: path.as_ref().canonicalize().unwrap(),
-        }
-    }
-
-    fn list_files(&self) -> Result<impl Iterator<Item = String>> {
-        Ok(self.path.read_dir()?.filter_map(|x| {
-            let x = x.ok()?;
-
-            // TODO proper error handling
-            let filename = match x.file_name().into_string() {
-                Ok(x) => x,
-                Err(e) => panic!("non-utf8 path name waa {:?}", e),
-            };
-
-            if Self::IGNORE.contains(&&*filename) {
-                None
-            } else {
-                Some(filename)
-            }
-        }))
-    }
 }
