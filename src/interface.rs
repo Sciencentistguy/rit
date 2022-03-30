@@ -1,29 +1,20 @@
 use std::path::PathBuf;
-use std::str::FromStr;
 
-use clap::ArgEnum;
 use clap::Parser;
+use clap::Subcommand;
 
-#[derive(Clone, Copy, Debug, ArgEnum)]
+#[derive(Clone, Debug, Subcommand)]
 pub enum Command {
     Init,
-    Commit,
-}
-
-impl FromStr for Command {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "init" => Ok(Self::Init),
-            "commit" => Ok(Self::Commit),
-            x => Err(x.to_string()),
-        }
-    }
+    Commit {
+        #[clap(short, long)]
+        message: Option<String>,
+    },
 }
 
 #[derive(Debug, Parser)]
 pub struct Opt {
+    #[clap(subcommand)]
     pub command: Command,
 
     #[clap(short, long)]

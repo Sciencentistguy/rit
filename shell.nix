@@ -8,4 +8,6 @@ pkgs.mkShell {
     cargo-edit
     git
   ];
+  RIT_AUTHOR_NAME="Jamie Quigley";
+  RIT_AUTHOR_EMAIL="jamie@quigley.xyz";
 }

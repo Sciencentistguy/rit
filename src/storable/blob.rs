@@ -1,11 +1,7 @@
+use super::Storable;
+
 use crate::util;
 use crate::util::Digest;
-
-pub trait Storable {
-    fn new(data: &[u8]) -> Self;
-    fn format(&self) -> &[u8];
-    fn get_oid(&self) -> &Digest;
-}
 
 pub struct Blob {
     oid: Digest,
@@ -13,7 +9,21 @@ pub struct Blob {
 }
 
 impl Storable for Blob {
-    fn new(data: &[u8]) -> Self {
+    fn format(&self) -> &[u8] {
+        &self.formatted
+    }
+
+    fn get_oid(&self) -> &Digest {
+        &self.oid
+    }
+
+    fn into_oid(self) -> Digest {
+        self.oid
+    }
+}
+
+impl Blob {
+    pub fn new(data: &[u8]) -> Self {
         let mut formatted = Vec::new();
         formatted.extend_from_slice(b"blob ");
         formatted.extend_from_slice(format!("{}", data.len()).as_bytes());
@@ -22,14 +32,6 @@ impl Storable for Blob {
         let oid = util::hash(&formatted);
 
         Self { oid, formatted }
-    }
-
-    fn format(&self) -> &[u8] {
-        &self.formatted
-    }
-
-    fn get_oid(&self) -> &Digest {
-        &self.oid
     }
 }
 
