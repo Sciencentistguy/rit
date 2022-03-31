@@ -1,16 +1,4 @@
-use sha1::{Digest as _, Sha1};
-
 use rand::prelude::*;
-
-pub type Digest = [u8; 20];
-
-pub fn hash(bytes: &[u8]) -> Digest {
-    let mut hasher = Sha1::new();
-    hasher.update(&bytes);
-    let mut dig: Digest = Default::default();
-    dig.copy_from_slice(&hasher.finalize()[..]);
-    dig
-}
 
 pub fn tmp_file_name() -> String {
     const ALPHANUM_CHARS: [char; 52] = [

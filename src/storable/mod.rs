@@ -2,7 +2,7 @@ pub mod blob;
 pub mod commit;
 pub mod tree;
 
-use crate::util::Digest;
+use crate::digest::Digest;
 
 pub trait Storable {
     /// Returns the storable uncompressed but formatted `"{type} {len}\0{data}"`.

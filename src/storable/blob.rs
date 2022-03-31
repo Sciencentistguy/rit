@@ -1,7 +1,6 @@
 use super::Storable;
 
-use crate::util;
-use crate::util::Digest;
+use crate::digest::Digest;
 
 pub struct Blob {
     oid: Digest,
@@ -29,7 +28,7 @@ impl Blob {
         formatted.extend_from_slice(format!("{}", data.len()).as_bytes());
         formatted.push(b'\0');
         formatted.extend_from_slice(data);
-        let oid = util::hash(&formatted);
+        let oid = Digest::new(&formatted);
 
         Self { oid, formatted }
     }
@@ -47,7 +46,7 @@ mod tests {
         ];
         let blob = Blob::new(text.as_bytes());
         let formatted = blob.format();
-        assert_eq!(blob.oid, expected_hash);
+        assert_eq!(*blob.oid, expected_hash);
         assert_eq!(formatted, b"blob 6\0hello\n");
     }
 }

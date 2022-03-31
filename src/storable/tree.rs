@@ -1,6 +1,6 @@
 use std::{ffi::OsStr, os::unix::prelude::OsStrExt};
 
-use crate::util::{self, Digest};
+use crate::digest::{self, Digest};
 
 use super::Storable;
 
@@ -34,7 +34,7 @@ impl Tree {
             data.push(b' ');
             data.extend_from_slice(&entry.filename);
             data.push(b'\0');
-            data.extend_from_slice(&entry.oid);
+            data.extend_from_slice(&*entry.oid);
         }
 
         let mut formatted = Vec::new();
@@ -42,12 +42,9 @@ impl Tree {
         formatted.extend_from_slice(format!("{}", data.len()).as_bytes());
         formatted.push(b'\0');
         formatted.extend_from_slice(&data);
-        let oid = util::hash(&formatted);
+        let oid = Digest::new(&formatted);
 
-        Self {
-            formatted,
-            oid,
-        }
+        Self { formatted, oid }
     }
 }
 

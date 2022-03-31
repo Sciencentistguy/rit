@@ -1,27 +1,28 @@
 #![allow(dead_code)]
 
 mod database;
+mod digest;
 mod interface;
 mod storable;
 mod util;
 mod workspace;
 
 pub use color_eyre::Result;
-use hex::ToHex;
+
+use digest::Digest;
+use interface::*;
+use storable::blob::Blob;
 use storable::commit::Author;
 use storable::commit::Commit;
 use storable::tree::Entry;
 use storable::tree::Tree;
+use storable::Storable;
+use workspace::Workspace;
 
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
-
-use crate::interface::*;
-use crate::storable::blob::Blob;
-use crate::storable::Storable;
-use crate::workspace::Workspace;
 
 use clap::Parser;
 use once_cell::sync::Lazy;
@@ -37,13 +38,18 @@ fn main() -> Result<()> {
     Lazy::force(&ARGS);
 
     match &ARGS.command {
-        Command::Init => init(&*ROOT)?,
-        Command::Commit { message } => commit(
-            &*ROOT,
-            message
-                .as_deref()
-                .expect("Using an editor for commit message is currently unimplemented"),
-        )?,
+        Command::Init => {
+            init(&*ROOT)?;
+        }
+        Command::Commit { message } => {
+            let commit_id = commit(
+                &*ROOT,
+                message
+                    .as_deref()
+                    .expect("Using an editor for commit message is currently unimplemented"),
+            )?;
+            println!("Created commit {}", commit_id.lower_hex())
+        }
     }
     Ok(())
 }
@@ -56,7 +62,7 @@ fn init<P: AsRef<Path>>(path: P) -> Result<()> {
     Ok(())
 }
 
-fn commit<P: AsRef<Path>>(root: P, message: &str) -> Result<()> {
+fn commit<P: AsRef<Path>>(root: P, message: &str) -> Result<Digest> {
     let root = root.as_ref();
     let wsp = Workspace::new(root);
     let database = database::Database::new(root.join(".git/objects"));
@@ -78,10 +84,9 @@ fn commit<P: AsRef<Path>>(root: P, message: &str) -> Result<()> {
 
     let commit = Commit::new(tree.into_oid(), author, message);
     database.store(&commit)?;
-    File::create(root.join(".git/HEAD"))?
-        .write_all(commit.get_oid().encode_hex::<String>().as_bytes())?;
+    File::create(root.join(".git/HEAD"))?.write_all(commit.get_oid().lower_hex().as_bytes())?;
 
-    Ok(())
+    Ok(commit.into_oid())
 }
 
 #[cfg(test)]
@@ -122,11 +127,12 @@ mod tests {
             std::fs::File::create(dir_rit.as_ref().join("file2"))?,
             "world"
         )?;
-        crate::commit(&dir_rit, "test")?;
+        let commit_id = crate::commit(&dir_rit, "test")?;
 
         let _ = Command::new("git")
             .arg("init")
             .current_dir(&dir_git)
+            .stdout(Stdio::null())
             .status()?;
         let _ = Command::new("git")
             .arg("config")
@@ -161,6 +167,7 @@ mod tests {
         let file1_path = Path::new("objects/cc/628ccd10742baea8241c5924df992b5c019f71");
         let tree_path = Path::new("objects/81/2bcf7a7db574cf24a2d6b8ed92cfd096c219e5");
         assert!(rit_dir.join(file1_path).exists());
+
         let git_dir = dir_git.as_ref().join(".git");
         let file1_blob_rit = std::fs::read(rit_dir.join(file1_path))?;
         let file1_blob_git = std::fs::read(git_dir.join(file1_path))?;
@@ -172,7 +179,25 @@ mod tests {
         assert_eq!(tree_rit, tree_git);
 
         // TODO check that there's a commit
-        
+        let generated_commit = String::from_utf8(
+            Command::new("git")
+                .arg("cat-file")
+                .arg("-p")
+                .arg(&commit_id.lower_hex())
+                .current_dir(&dir_rit)
+                .output()?
+                .stdout,
+        )
+        .unwrap();
+
+        if let [tree, _author, _committer, _, msg] =
+            generated_commit.lines().collect::<Vec<_>>()[..]
+        {
+            assert_eq!(tree, "tree 812bcf7a7db574cf24a2d6b8ed92cfd096c219e5");
+            assert_eq!(msg, "test");
+        } else {
+            panic!("Invalid commit: {}", generated_commit);
+        }
         Ok(())
     }
 }

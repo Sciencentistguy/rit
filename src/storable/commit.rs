@@ -1,6 +1,6 @@
 use hex::ToHex;
 
-use crate::util::{Digest, self};
+use crate::digest::Digest;
 
 use super::Storable;
 
@@ -37,12 +37,9 @@ impl Commit {
         formatted.push(b'\0');
         formatted.extend_from_slice(data.as_bytes());
 
-        let oid = util::hash(&formatted);
+        let oid = Digest::new(&formatted);
 
-        Self {
-            formatted, 
-            oid
-        }
+        Self { formatted, oid }
     }
 }
 
