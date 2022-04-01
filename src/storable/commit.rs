@@ -1,5 +1,3 @@
-use hex::ToHex;
-
 use crate::digest::Digest;
 
 use super::Storable;
@@ -15,21 +13,31 @@ pub struct Commit {
 }
 
 impl Commit {
-    pub fn new(tree_oid: Digest, author: Author, message: &str) -> Self {
-        let l1 = format!("tree {}", tree_oid.encode_hex::<String>());
-        let l2 = format!(
-            "author {} <{}> {}",
+    pub fn new(parent_commit: Option<Digest>, tree: Digest, author: Author, message: &str) -> Self {
+        let parent = parent_commit.map(|x| x.to_hex());
+
+        let data = format!(
+            "\
+            tree {}\n\
+            {}\
+            author {} <{}> {}\n\
+            committer {} <{}> {}\n\
+            \n\
+            {}",
+            tree.to_hex(),
+            if let Some(parent) = parent {
+                format!("parent {parent}\n")
+            } else {
+                "".into()
+            },
             author.name,
             author.email,
             chrono::offset::Local::now().format("%s %z"),
-        );
-        let l3 = format!(
-            "commiter {} <{}> {}",
             author.name,
             author.email,
             chrono::offset::Local::now().format("%s %z"),
+            message
         );
-        let data = format!("{}\n{}\n{}\n\n{}\n", l1, l2, l3, message);
 
         let mut formatted = Vec::new();
         formatted.extend_from_slice(b"commit ");
@@ -44,7 +52,7 @@ impl Commit {
 }
 
 impl Storable for Commit {
-    fn format(&self) -> &[u8] {
+    fn formatted(&self) -> &[u8] {
         &self.formatted
     }
 

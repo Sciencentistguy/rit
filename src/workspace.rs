@@ -2,20 +2,20 @@ use crate::Result;
 use std::path::{Path, PathBuf};
 
 pub struct Workspace {
-    path: PathBuf,
+    root_path: PathBuf,
 }
 
 impl Workspace {
     const IGNORE: [&'static str; 1] = [".git"];
 
-    pub fn new(path: impl AsRef<Path>) -> Self {
+    pub fn new(root_path: impl AsRef<Path>) -> Self {
         Self {
-            path: path.as_ref().canonicalize().unwrap(),
+            root_path: root_path.as_ref().canonicalize().unwrap(),
         }
     }
 
     pub fn list_files(&self) -> Result<impl Iterator<Item = String>> {
-        Ok(self.path.read_dir()?.filter_map(|x| {
+        Ok(self.root_path.read_dir()?.filter_map(|x| {
             let x = x.ok()?;
 
             // TODO proper error handling

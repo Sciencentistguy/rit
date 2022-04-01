@@ -1,6 +1,6 @@
 use std::{ffi::OsStr, os::unix::prelude::OsStrExt};
 
-use crate::digest::{self, Digest};
+use crate::digest::Digest;
 
 use super::Storable;
 
@@ -49,7 +49,7 @@ impl Tree {
 }
 
 impl Storable for Tree {
-    fn format(&self) -> &[u8] {
+    fn formatted(&self) -> &[u8] {
         // "{type} {len}\0{formatted}"
         &self.formatted
     }

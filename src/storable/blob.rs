@@ -8,7 +8,7 @@ pub struct Blob {
 }
 
 impl Storable for Blob {
-    fn format(&self) -> &[u8] {
+    fn formatted(&self) -> &[u8] {
         &self.formatted
     }
 
@@ -45,7 +45,7 @@ mod tests {
             206, 1, 54, 37, 3, 11, 168, 219, 169, 6, 247, 86, 150, 127, 158, 156, 163, 148, 70, 74,
         ];
         let blob = Blob::new(text.as_bytes());
-        let formatted = blob.format();
+        let formatted = blob.formatted();
         assert_eq!(*blob.oid, expected_hash);
         assert_eq!(formatted, b"blob 6\0hello\n");
     }

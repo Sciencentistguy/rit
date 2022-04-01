@@ -3,14 +3,18 @@
 mod database;
 mod digest;
 mod interface;
+mod refs;
 mod storable;
 mod util;
 mod workspace;
+mod lock;
 
 pub use color_eyre::Result;
 
+use database::Database;
 use digest::Digest;
 use interface::*;
+use refs::Refs;
 use storable::blob::Blob;
 use storable::commit::Author;
 use storable::commit::Commit;
@@ -19,8 +23,6 @@ use storable::tree::Tree;
 use storable::Storable;
 use workspace::Workspace;
 
-use std::fs::File;
-use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -38,9 +40,7 @@ fn main() -> Result<()> {
     Lazy::force(&ARGS);
 
     match &ARGS.command {
-        Command::Init => {
-            init(&*ROOT)?;
-        }
+        Command::Init => init(&*ROOT)?,
         Command::Commit { message } => {
             let commit_id = commit(
                 &*ROOT,
@@ -48,7 +48,7 @@ fn main() -> Result<()> {
                     .as_deref()
                     .expect("Using an editor for commit message is currently unimplemented"),
             )?;
-            println!("Created commit {}", commit_id.lower_hex())
+            println!("Created commit {}", commit_id.to_hex())
         }
     }
     Ok(())
@@ -65,7 +65,8 @@ fn init<P: AsRef<Path>>(path: P) -> Result<()> {
 fn commit<P: AsRef<Path>>(root: P, message: &str) -> Result<Digest> {
     let root = root.as_ref();
     let wsp = Workspace::new(root);
-    let database = database::Database::new(root.join(".git/objects"));
+    let refs = Refs::new(root);
+    let database = Database::new(root);
     let mut entries = Vec::new();
     for file in wsp.list_files()? {
         let filepath = root.join(file);
@@ -77,14 +78,16 @@ fn commit<P: AsRef<Path>>(root: P, message: &str) -> Result<Digest> {
     let tree = Tree::new(entries);
     database.store(&tree)?;
 
+    let parent_commit = refs.read_head()?;
+
     let author = Author {
         name: std::env::var("RIT_AUTHOR_NAME")?,
         email: std::env::var("RIT_AUTHOR_EMAIL")?,
     };
 
-    let commit = Commit::new(tree.into_oid(), author, message);
+    let commit = Commit::new(parent_commit, tree.into_oid(), author, message);
     database.store(&commit)?;
-    File::create(root.join(".git/HEAD"))?.write_all(commit.get_oid().lower_hex().as_bytes())?;
+    refs.set_head(commit.get_oid())?;
 
     Ok(commit.into_oid())
 }
@@ -178,12 +181,11 @@ mod tests {
         let tree_git = std::fs::read(git_dir.join(tree_path))?;
         assert_eq!(tree_rit, tree_git);
 
-        // TODO check that there's a commit
         let generated_commit = String::from_utf8(
             Command::new("git")
                 .arg("cat-file")
                 .arg("-p")
-                .arg(&commit_id.lower_hex())
+                .arg(&commit_id.to_hex())
                 .current_dir(&dir_rit)
                 .output()?
                 .stdout,

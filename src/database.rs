@@ -1,43 +1,45 @@
 use crate::storable::Storable;
 use crate::util;
-use color_eyre::eyre::ContextCompat;
-
-use flate2::write::ZlibEncoder;
-use flate2::Compression;
-
 use crate::Result;
-use hex::ToHex;
+
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
+use color_eyre::eyre::eyre;
+use flate2::write::ZlibEncoder;
+use flate2::Compression;
+
 pub struct Database {
-    path: PathBuf,
+    database_root: PathBuf,
 }
 
 impl Database {
-    pub fn new(path: impl AsRef<Path>) -> Self {
-        Self {
-            path: path.as_ref().to_owned(),
-        }
+    pub fn new(root_path: impl AsRef<Path>) -> Self {
+        let mut database_root = root_path.as_ref().canonicalize().unwrap();
+        database_root.push(".git");
+        database_root.push("objects");
+        Self { database_root }
     }
 
     pub fn store(&self, obj: &impl Storable) -> Result<()> {
-        self.write_object(obj)
-    }
+        let content = obj.formatted();
 
-    fn write_object(&self, obj: &impl Storable) -> Result<()> {
-        let content = obj.format();
-        let oid = obj.get_oid();
-        let oid_string: String = oid.encode_hex();
         let object_path = {
-            let mut p = self.path.to_owned();
-            p.push(&oid_string[0..2]);
-            p.push(&oid_string[2..]);
-            p
+            let mut x = self.database_root.to_owned();
+            let oid = obj.get_oid().to_hex();
+            x.push(&oid[0..2]);
+            x.push(&oid[2..]);
+            x
         };
 
-        let dirname = object_path.parent().wrap_err("object had no parent")?;
+        if object_path.exists() {
+            return Ok(());
+        }
+
+        let dirname = object_path
+            .parent()
+            .ok_or_else(|| eyre!("object had no parent"))?;
 
         let temp_path = dirname.join(util::tmp_file_name());
 

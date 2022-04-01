@@ -17,7 +17,7 @@ impl Digest {
         dig.copy_from_slice(&hasher.finalize()[..]);
         Self(dig)
     }
-    pub fn lower_hex(&self) -> String {
+    pub fn to_hex(&self) -> String {
         hex::encode(self.0)
     }
 }
@@ -38,12 +38,12 @@ impl DerefMut for Digest {
 
 impl LowerHex for Digest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.lower_hex())
+        write!(f, "{}", self.to_hex())
     }
 }
 
 impl Debug for Digest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Digest({})", self.lower_hex())
+        write!(f, "Digest({})", self.to_hex())
     }
 }
