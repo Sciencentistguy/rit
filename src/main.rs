@@ -77,10 +77,16 @@ fn commit<P: AsRef<Path>>(root: P, message: &str) -> Result<Digest> {
         let data = std::fs::read(&filepath)?;
         let blob = Blob::new(&data);
         database.store(&blob)?;
-        entries.push(Entry::new(filepath.file_name().unwrap(), blob.into_oid()));
+        let metadata = std::fs::metadata(&filepath)?;
+        entries.push(Entry::new(
+            filepath.file_name().unwrap(),
+            blob.into_oid(),
+            metadata,
+        ));
     }
     let tree = Tree::new(entries);
     database.store(&tree)?;
+    dbg!(tree.get_oid());
 
     let parent_commit = refs.read_head()?;
 
@@ -99,7 +105,9 @@ fn commit<P: AsRef<Path>>(root: P, message: &str) -> Result<Digest> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::Permissions;
     use std::io::Write;
+    use std::os::unix::fs::PermissionsExt;
     use std::process::{Command, Stdio};
     use tempdir::TempDir;
 
@@ -122,18 +130,15 @@ mod tests {
     #[test]
     fn rit_commit() -> Result<()> {
         let dir_rit = TempDir::new("")?;
+        let dir_rit = dir_rit.as_ref();
         let dir_git = TempDir::new("")?;
+        let dir_git = dir_git.as_ref();
 
         // Rit create files
         crate::init(&dir_rit)?;
-        writeln!(
-            std::fs::File::create(dir_rit.as_ref().join("file1"))?,
-            "hello"
-        )?;
-        writeln!(
-            std::fs::File::create(dir_rit.as_ref().join("file2"))?,
-            "world"
-        )?;
+        writeln!(std::fs::File::create(dir_rit.join("file1"))?, "hello")?;
+        writeln!(std::fs::File::create(dir_rit.join("file2"))?, "world")?;
+        std::fs::set_permissions(dir_rit.join("file2"), Permissions::from_mode(0o100755))?;
         let commit_id = crate::commit(&dir_rit, "test")?;
 
         let _ = Command::new("git")
@@ -148,14 +153,10 @@ mod tests {
             .arg("false")
             .current_dir(&dir_git)
             .status()?;
-        writeln!(
-            std::fs::File::create(dir_git.as_ref().join("file1"))?,
-            "hello"
-        )?;
-        writeln!(
-            std::fs::File::create(dir_git.as_ref().join("file2"))?,
-            "world"
-        )?;
+        writeln!(std::fs::File::create(dir_git.join("file1"))?, "hello")?;
+        writeln!(std::fs::File::create(dir_git.join("file2"))?, "world")?;
+        std::fs::set_permissions(dir_git.join("file2"), Permissions::from_mode(0o100755))?;
+
         Command::new("git")
             .arg("add")
             .arg("--all")
@@ -170,12 +171,12 @@ mod tests {
             .stdout(Stdio::null())
             .status()?;
 
-        let rit_dir = dir_rit.as_ref().join(".git");
+        let rit_dir = dir_rit.join(".git");
         let file1_path = Path::new("objects/cc/628ccd10742baea8241c5924df992b5c019f71");
-        let tree_path = Path::new("objects/81/2bcf7a7db574cf24a2d6b8ed92cfd096c219e5");
+        let tree_path = Path::new("objects/b0/30fc230ce2ccfe74eeec1617105b26311f0e4a");
         assert!(rit_dir.join(file1_path).exists());
 
-        let git_dir = dir_git.as_ref().join(".git");
+        let git_dir = dir_git.join(".git");
         let file1_blob_rit = std::fs::read(rit_dir.join(file1_path))?;
         let file1_blob_git = std::fs::read(git_dir.join(file1_path))?;
         assert_eq!(file1_blob_rit, file1_blob_git);
@@ -196,11 +197,12 @@ mod tests {
         )
         .unwrap();
 
-        if let [tree, _author, _committer, _, msg] =
-            generated_commit.lines().collect::<Vec<_>>()[..]
-        {
-            assert_eq!(tree, "tree 812bcf7a7db574cf24a2d6b8ed92cfd096c219e5");
-            assert_eq!(msg, "test");
+        if let [tree, _, _, _, msg] = generated_commit.lines().collect::<Vec<_>>()[..] {
+            assert_eq!(
+                tree, "tree b030fc230ce2ccfe74eeec1617105b26311f0e4a",
+                "Tree OID in commit did not match"
+            );
+            assert_eq!(msg, "test", "Commit message did not match");
         } else {
             panic!("Invalid commit: {}", generated_commit);
         }

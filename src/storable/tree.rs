@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, os::unix::prelude::OsStrExt};
+use std::{ffi::OsStr, fs::Metadata, os::unix::prelude::*};
 
 use crate::digest::Digest;
 
@@ -7,13 +7,15 @@ use super::Storable;
 pub struct Entry {
     filename: Vec<u8>,
     oid: Digest,
+    mode: u32,
 }
 
 impl Entry {
-    pub fn new(filename: &OsStr, oid: Digest) -> Self {
+    pub fn new(filename: &OsStr, oid: Digest, metadata: Metadata) -> Self {
         Self {
             filename: filename.as_bytes().to_owned(),
             oid,
+            mode: metadata.mode(),
         }
     }
 }
@@ -25,12 +27,12 @@ pub struct Tree {
 
 impl Tree {
     pub fn new(mut entries: Vec<Entry>) -> Self {
-        const MODE: &[u8] = b"100644";
         entries.sort_unstable_by(|a, b| a.filename.cmp(&b.filename));
 
         let mut data = Vec::new();
         for entry in &entries {
-            data.extend_from_slice(MODE);
+            let mode = format!("{:o}", entry.mode);
+            data.extend_from_slice(mode.as_bytes());
             data.push(b' ');
             data.extend_from_slice(&entry.filename);
             data.push(b'\0');
