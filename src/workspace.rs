@@ -14,20 +14,21 @@ impl Workspace {
         }
     }
 
-    pub fn list_files(&self) -> Result<impl Iterator<Item = String>> {
+    pub fn list_files(&self) -> Result<impl Iterator<Item = PathBuf>> {
         Ok(self.root_path.read_dir()?.filter_map(|x| {
             let x = x.ok()?;
 
-            // TODO proper error handling
-            let filename = match x.file_name().into_string() {
-                Ok(x) => x,
-                Err(e) => panic!("non-utf8 path name waa {:?}", e),
-            };
-
-            if Self::IGNORE.contains(&&*filename) {
-                None
-            } else {
-                Some(filename)
+            let path = x.path();
+            match path
+                .file_name()
+                .expect("not dealing with root")
+                .to_str()
+                .map(|x| Self::IGNORE.contains(&x))
+            {
+                // Filename is in IGNORE
+                Some(true) => None,
+                //Filename is not in IGNORE (or is invalid UTF-8, which means not in IGNORE)
+                _ => Some(path),
             }
         }))
     }

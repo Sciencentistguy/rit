@@ -3,11 +3,11 @@
 mod database;
 mod digest;
 mod interface;
+mod lock;
 mod refs;
 mod storable;
 mod util;
 mod workspace;
-mod lock;
 
 pub use color_eyre::Result;
 
@@ -54,6 +54,14 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+fn open_repo<P: AsRef<Path>>(root_path: P) -> (Workspace, Refs, Database) {
+    let root_path = root_path.as_ref();
+    let workspace = Workspace::new(root_path);
+    let refs = Refs::new(root_path);
+    let database = Database::new(root_path);
+    (workspace, refs, database)
+}
+
 fn init<P: AsRef<Path>>(path: P) -> Result<()> {
     let dir = path.as_ref().join(".git");
     for d in ["objects", "refs"] {
@@ -63,13 +71,9 @@ fn init<P: AsRef<Path>>(path: P) -> Result<()> {
 }
 
 fn commit<P: AsRef<Path>>(root: P, message: &str) -> Result<Digest> {
-    let root = root.as_ref();
-    let wsp = Workspace::new(root);
-    let refs = Refs::new(root);
-    let database = Database::new(root);
+    let (workspace, refs, database) = open_repo(root);
     let mut entries = Vec::new();
-    for file in wsp.list_files()? {
-        let filepath = root.join(file);
+    for filepath in workspace.list_files()? {
         let data = std::fs::read(&filepath)?;
         let blob = Blob::new(&data);
         database.store(&blob)?;
