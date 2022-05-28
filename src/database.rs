@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use color_eyre::eyre::eyre;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
+use tracing::*;
 
 pub struct Database {
     database_root: PathBuf,
@@ -23,6 +24,7 @@ impl Database {
     }
 
     pub fn store(&self, obj: &impl Storable) -> Result<()> {
+        trace!(oid=?obj.get_oid(), "Writing file to database");
         let content = obj.formatted();
 
         let object_path = {

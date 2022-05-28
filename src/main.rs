@@ -11,23 +11,24 @@ mod workspace;
 
 pub use color_eyre::Result;
 
-use database::Database;
-use digest::Digest;
-use interface::*;
-use refs::Refs;
-use storable::blob::Blob;
-use storable::commit::Author;
-use storable::commit::Commit;
-use storable::tree::Entry;
-use storable::tree::Tree;
-use storable::Storable;
-use workspace::Workspace;
+use crate::database::Database;
+use crate::digest::Digest;
+use crate::interface::*;
+use crate::refs::Refs;
+use crate::storable::blob::Blob;
+use crate::storable::commit::Author;
+use crate::storable::commit::Commit;
+use crate::storable::tree::Entry;
+use crate::storable::tree::Tree;
+use crate::storable::Storable;
+use crate::workspace::Workspace;
 
 use std::path::Path;
 use std::path::PathBuf;
 
 use clap::Parser;
 use once_cell::sync::Lazy;
+use tracing_subscriber::prelude::*;
 
 static ARGS: Lazy<Opt> = Lazy::new(Opt::parse);
 static ROOT: Lazy<PathBuf> = Lazy::new(|| match &ARGS.path {
@@ -37,6 +38,12 @@ static ROOT: Lazy<PathBuf> = Lazy::new(|| match &ARGS.path {
 
 fn main() -> Result<()> {
     color_eyre::install().unwrap();
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+
     Lazy::force(&ARGS);
 
     match &ARGS.command {
@@ -54,24 +61,24 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn open_repo<P: AsRef<Path>>(root_path: P) -> (Workspace, Refs, Database) {
-    let root_path = root_path.as_ref();
-    let workspace = Workspace::new(root_path);
-    let refs = Refs::new(root_path);
-    let database = Database::new(root_path);
+fn open_repo<P: AsRef<Path>>(repo_root: P) -> (Workspace, Refs, Database) {
+    let repo_root = repo_root.as_ref();
+    let workspace = Workspace::new(repo_root);
+    let refs = Refs::new(repo_root);
+    let database = Database::new(repo_root);
     (workspace, refs, database)
 }
 
-fn init<P: AsRef<Path>>(path: P) -> Result<()> {
-    let dir = path.as_ref().join(".git");
+fn init<P: AsRef<Path>>(repo_root: P) -> Result<()> {
+    let dir = repo_root.as_ref().join(".git");
     for d in ["objects", "refs"] {
         std::fs::create_dir_all(dir.join(d))?;
     }
     Ok(())
 }
 
-fn commit<P: AsRef<Path>>(root: P, message: &str) -> Result<Digest> {
-    let (workspace, refs, database) = open_repo(root);
+fn commit<P: AsRef<Path>>(repo_root: P, message: &str) -> Result<Digest> {
+    let (workspace, refs, database) = open_repo(repo_root);
     let mut entries = Vec::new();
     for filepath in workspace.list_files()? {
         let data = std::fs::read(&filepath)?;
@@ -134,8 +141,11 @@ mod tests {
         let dir_git = TempDir::new("")?;
         let dir_git = dir_git.as_ref();
 
-        std::env::set_var("RIT_AUTHOR_NAME", "Jamie Quigley");
-        std::env::set_var("RIT_AUTHOR_EMAIL", "jamie@quigley.xyz");
+        const COMMIT_NAME: &str = "Jamie Quigley";
+        const COMMIT_EMAIL: &str = "jamie@quigley.xyz";
+
+        std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
+        std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
 
         // Rit create files
         crate::init(&dir_rit)?;
@@ -145,28 +155,31 @@ mod tests {
         let commit_id = crate::commit(&dir_rit, "test")?;
 
         let _ = Command::new("git")
+            .args(["-c", &format!("user.name={}", COMMIT_NAME)])
+            .args(["-c", &format!("user.email={}", COMMIT_EMAIL)])
+            .args(["-c", "commit.gpgsign=false"])
             .arg("init")
             .current_dir(&dir_git)
             .stdout(Stdio::null())
             .status()?;
-        let _ = Command::new("git")
-            .arg("config")
-            .arg("--local")
-            .arg("commit.gpgsign")
-            .arg("false")
-            .current_dir(&dir_git)
-            .status()?;
+
         writeln!(std::fs::File::create(dir_git.join("file1"))?, "hello")?;
         writeln!(std::fs::File::create(dir_git.join("file2"))?, "world")?;
         std::fs::set_permissions(dir_git.join("file2"), Permissions::from_mode(0o100755))?;
 
         Command::new("git")
+            .args(["-c", &format!("user.name={}", COMMIT_NAME)])
+            .args(["-c", &format!("user.email={}", COMMIT_EMAIL)])
+            .args(["-c", "commit.gpgsign=false"])
             .arg("add")
             .arg("--all")
             .current_dir(&dir_git)
             .stdout(Stdio::null())
             .status()?;
         Command::new("git")
+            .args(["-c", &format!("user.name={}", COMMIT_NAME)])
+            .args(["-c", &format!("user.email={}", COMMIT_EMAIL)])
+            .args(["-c", "commit.gpgsign=false"])
             .arg("commit")
             .arg("-m")
             .arg("test")

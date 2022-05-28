@@ -1,11 +1,11 @@
-use color_eyre::eyre::{eyre, Context};
-
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::digest::Digest;
 use crate::lock::LockedFile;
 use crate::Result;
+
+use color_eyre::eyre::{eyre, Context};
 
 pub struct Refs {
     git_dir: PathBuf,
