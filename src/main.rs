@@ -147,6 +147,15 @@ mod tests {
         std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
         std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
 
+        let git_command_args = [
+            "-c",
+            &format!("user.name={}", COMMIT_NAME),
+            "-c",
+            &format!("user.email={}", COMMIT_EMAIL),
+            "-c",
+            "commit.gpgsign=false",
+        ];
+
         // Rit create files
         crate::init(&dir_rit)?;
         writeln!(std::fs::File::create(dir_rit.join("file1"))?, "hello")?;
@@ -155,9 +164,7 @@ mod tests {
         let commit_id = crate::commit(&dir_rit, "test")?;
 
         let _ = Command::new("git")
-            .args(["-c", &format!("user.name={}", COMMIT_NAME)])
-            .args(["-c", &format!("user.email={}", COMMIT_EMAIL)])
-            .args(["-c", "commit.gpgsign=false"])
+            .args(&git_command_args)
             .arg("init")
             .current_dir(&dir_git)
             .stdout(Stdio::null())
@@ -168,18 +175,14 @@ mod tests {
         std::fs::set_permissions(dir_git.join("file2"), Permissions::from_mode(0o100755))?;
 
         Command::new("git")
-            .args(["-c", &format!("user.name={}", COMMIT_NAME)])
-            .args(["-c", &format!("user.email={}", COMMIT_EMAIL)])
-            .args(["-c", "commit.gpgsign=false"])
+            .args(&git_command_args)
             .arg("add")
             .arg("--all")
             .current_dir(&dir_git)
             .stdout(Stdio::null())
             .status()?;
         Command::new("git")
-            .args(["-c", &format!("user.name={}", COMMIT_NAME)])
-            .args(["-c", &format!("user.email={}", COMMIT_EMAIL)])
-            .args(["-c", "commit.gpgsign=false"])
+            .args(&git_command_args)
             .arg("commit")
             .arg("-m")
             .arg("test")

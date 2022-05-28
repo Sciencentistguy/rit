@@ -15,22 +15,24 @@ impl Workspace {
         }
     }
 
-    pub fn list_files(&self) -> Result<impl Iterator<Item = PathBuf>> {
-        Ok(self.root_path.read_dir()?.filter_map(|x| {
-            let x = x.ok()?;
+    pub fn list_files(&self) -> Result<Vec<PathBuf>> {
+        let mut files = Vec::new();
+        for x in self.root_path.read_dir()? {
+            let x = x?;
 
             let path = x.path();
-            match path
+            if let Some(true) = path
                 .file_name()
                 .expect("not dealing with root")
                 .to_str()
                 .map(|x| Self::IGNORE.contains(&x))
             {
                 // Filename is in IGNORE
-                Some(true) => None,
-                //Filename is not in IGNORE (or is invalid UTF-8, which means not in IGNORE)
-                _ => Some(path),
+                continue;
             }
-        }))
+            files.push(path);
+        }
+
+        Ok(files)
     }
 }
