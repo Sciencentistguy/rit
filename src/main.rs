@@ -134,6 +134,9 @@ mod tests {
         let dir_git = TempDir::new("")?;
         let dir_git = dir_git.as_ref();
 
+        std::env::set_var("RIT_AUTHOR_NAME", "Jamie Quigley");
+        std::env::set_var("RIT_AUTHOR_EMAIL", "jamie@quigley.xyz");
+
         // Rit create files
         crate::init(&dir_rit)?;
         writeln!(std::fs::File::create(dir_rit.join("file1"))?, "hello")?;
