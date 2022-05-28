@@ -4,10 +4,18 @@ use crate::digest::Digest;
 
 use super::Storable;
 
+pub struct Mode(u32);
+
+impl std::fmt::Octal for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:o}", self.0)
+    }
+}
+
 pub struct Entry {
     filename: Vec<u8>,
     oid: Digest,
-    mode: u32,
+    mode: Mode,
 }
 
 impl Entry {
@@ -15,7 +23,8 @@ impl Entry {
         Self {
             filename: filename.as_bytes().to_owned(),
             oid,
-            mode: metadata.mode(),
+            //FIXME: unix-specific
+            mode: Mode(metadata.mode()),
         }
     }
 }

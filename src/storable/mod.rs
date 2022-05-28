@@ -6,8 +6,7 @@ use crate::digest::Digest;
 
 pub trait Storable {
     /// Returns the storable uncompressed but formatted `"{type} {len}\0{data}"`.
-    /// e.g.
-    /// a blob `"hello\n"` becomes `"blob 6\0hello\n"`
+    /// e.g. a blob `"hello\n"` becomes `"blob 6\0hello\n"`
     fn formatted(&self) -> &[u8];
     fn get_oid(&self) -> &Digest;
     fn into_oid(self) -> Digest;
