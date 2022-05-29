@@ -10,6 +10,7 @@ mod util;
 mod workspace;
 
 pub use color_eyre::Result;
+use walkdir::WalkDir;
 
 use crate::database::Database;
 use crate::digest::Digest;
@@ -78,20 +79,40 @@ fn init<P: AsRef<Path>>(repo_root: P) -> Result<()> {
 }
 
 fn commit<P: AsRef<Path>>(repo_root: P, message: &str) -> Result<Digest> {
+    let repo_root = repo_root.as_ref();
+
     let (workspace, refs, database) = open_repo(repo_root);
+
     let mut entries = Vec::new();
-    for filepath in workspace.list_files()? {
-        let data = std::fs::read(&filepath)?;
-        let blob = Blob::new(&data);
-        database.store(&blob)?;
-        let metadata = std::fs::metadata(&filepath)?;
-        entries.push(Entry::new(
-            filepath.file_name().unwrap(),
-            blob.into_oid(),
-            metadata,
-        ));
+
+    for entry in WalkDir::new(repo_root) {
+        let entry = entry?;
+        let path = entry.path();
+        if path
+            .components()
+            .any(|c| AsRef::<Path>::as_ref(&c) == Path::new(".git"))
+        {
+            continue;
+        }
+        if !path.is_dir() {
+            println!("file: {:?}", path.canonicalize());
+            let data = std::fs::read(&path)?;
+            let blob = Blob::new(&data);
+            database.store(&blob)?;
+            let metadata = std::fs::metadata(&path)?;
+            entries.push(Entry::new(
+                path.strip_prefix(repo_root)?.to_owned(),
+                blob.into_oid(),
+                metadata,
+            ));
+        }
     }
-    let tree = Tree::new(entries);
+
+    for entry in &entries {
+        println!("{:?}", entry.path());
+    }
+
+    let tree = Tree::build(entries)?;
     database.store(&tree)?;
     dbg!(tree.get_oid());
 
