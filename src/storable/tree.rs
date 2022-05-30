@@ -53,6 +53,12 @@ impl Entry {
     fn parents(&self) -> Option<&Path> {
         self.path.parent()
     }
+
+    fn reduce_path(&mut self) {
+        let mut it = self.path.iter();
+        it.next();
+        self.path = it.as_path().to_owned();
+    }
 }
 
 pub struct Tree {
@@ -85,7 +91,9 @@ impl Tree {
     }
 
     pub fn build(entries: Vec<Entry>) -> Result<Self> {
-        Ok(PartialTree::build(entries)?.freeze())
+        let _ = PartialTree::build(entries)?.freeze();
+        todo!();
+        // Ok()
     }
 }
 
@@ -95,43 +103,61 @@ enum V {
     Tree(PartialTree),
 }
 
+impl V {
+    fn tree(name: String) -> Self {
+        Self::Tree(PartialTree::new(name))
+    }
+}
+
 #[derive(Debug)]
 struct PartialTree {
+    name: String,
     entries: HashMap<String, V>,
 }
 
 impl PartialTree {
-    fn new() -> Self {
+    fn new(name: String) -> Self {
         Self {
+            name,
             entries: HashMap::new(),
         }
     }
 
-    fn freeze(self) -> Tree {
-        println!("freezing self: {:#?}", &self);
-        todo!()
+    fn freeze(&self) {
+        for it in self.entries.values() {
+            match it {
+                V::Tree(tree) => {
+                    tree.freeze();
+                    println!("storing tree {:?}", tree);
+                }
+                V::Entry(entry) => {
+                    println!("storing file {:?}", entry);
+                }
+            }
+        }
     }
 
     fn build(mut entries: Vec<Entry>) -> Result<PartialTree> {
         entries.sort_unstable_by(|a, b| a.path.cmp(&b.path));
         let mut root = PartialTree {
+            name: "root".to_owned(),
             entries: HashMap::new(),
         };
 
         for entry in entries {
             println!("doing entry {:?}", entry.path());
-            let mut parents = entry.parents();
-            if parents == Some(Path::new("")) {
+            let mut parents = entry.parents().map(|x| x.to_owned());
+            if parents.as_deref() == Some(Path::new("")) {
                 parents = None;
             }
-            root.add_entry(parents, &entry)?;
+            root.add_entry(parents.as_deref(), entry)?;
         }
 
         Ok(root)
     }
 
     // XXX this should not take parents and also entry, parents can be gotten from entry
-    fn add_entry(&mut self, parents: Option<&Path>, entry: &Entry) -> Result<()> {
+    fn add_entry(&mut self, parents: Option<&Path>, mut entry: Entry) -> Result<()> {
         match parents {
             None => {
                 self.entries.insert(
@@ -151,7 +177,7 @@ impl PartialTree {
                 let tree = self
                     .entries
                     .entry(basename.clone())
-                    .or_insert_with(|| V::Tree(PartialTree::new()));
+                    .or_insert_with(|| V::tree(basename));
                 let tree = match tree {
                     V::Entry(_) => {
                         unreachable!("tree for '{:?}' should be tree not entry", entry.path())
@@ -159,7 +185,9 @@ impl PartialTree {
                     V::Tree(x) => x,
                 };
 
-                let t = parents.strip_prefix(basename)?;
+                let t = parents.strip_prefix(&tree.name)?;
+
+                entry.reduce_path();
 
                 tree.add_entry(if t == Path::new("") { None } else { Some(t) }, entry)?;
             }
