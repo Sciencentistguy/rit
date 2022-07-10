@@ -1,6 +1,7 @@
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     fs::Metadata,
+    io::Write,
     os::unix::prelude::*,
     path::{Path, PathBuf},
 };
@@ -56,37 +57,37 @@ pub struct Tree {
 }
 
 // impl Tree {
-    // pub fn new(mut entries: Vec<Entry>) -> Self {
-        // entries.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+// pub fn new(mut entries: Vec<Entry>) -> Self {
+// entries.sort_unstable_by(|a, b| a.path.cmp(&b.path));
 
-        // let mut data = Vec::new();
-        // for entry in &entries {
-            // let mode = format!("{:o}", entry.mode);
-            // data.extend_from_slice(mode.as_bytes());
-            // data.push(b' ');
-            // data.extend_from_slice(entry.path.as_os_str().as_bytes());
-            // data.push(b'\0');
-            // data.extend_from_slice(&*entry.oid);
-        // }
+// let mut data = Vec::new();
+// for entry in &entries {
+// let mode = format!("{:o}", entry.mode);
+// data.extend_from_slice(mode.as_bytes());
+// data.push(b' ');
+// data.extend_from_slice(entry.path.as_os_str().as_bytes());
+// data.push(b'\0');
+// data.extend_from_slice(&*entry.oid);
+// }
 
-        // let mut formatted = Vec::new();
-        // formatted.extend_from_slice(b"tree ");
-        // formatted.extend_from_slice(format!("{}", data.len()).as_bytes());
-        // formatted.push(b'\0');
-        // formatted.extend_from_slice(&data);
-        // let oid = Digest::new(&formatted);
+// let mut formatted = Vec::new();
+// formatted.extend_from_slice(b"tree ");
+// formatted.extend_from_slice(format!("{}", data.len()).as_bytes());
+// formatted.push(b'\0');
+// formatted.extend_from_slice(&data);
+// let oid = Digest::new(&formatted);
 
-        // Self { formatted, oid }
-    // }
+// Self { formatted, oid }
+// }
 
-    // pub fn build(entries: Vec<Entry>) -> Result<Self> {
-        // trace!("Building tree of entries");
-        // let pt = PartialTree::build(entries)?;
-        // trace!(tree = ?pt, "Finished building tree");
-        // let t = pt.freeze();
-        // todo!();
-        // // Ok()
-    // }
+// pub fn build(entries: Vec<Entry>) -> Result<Self> {
+// trace!("Building tree of entries");
+// let pt = PartialTree::build(entries)?;
+// trace!(tree = ?pt, "Finished building tree");
+// let t = pt.freeze();
+// todo!();
+// // Ok()
+// }
 // }
 
 #[derive(Debug)]
@@ -106,7 +107,7 @@ impl PartialTreeEntry {
 
 #[derive(Debug)]
 pub struct PartialTree {
-    entries: HashMap<String, PartialTreeEntry>,
+    entries: BTreeMap<String, PartialTreeEntry>,
     oid: Option<Digest>,
 }
 
@@ -115,7 +116,7 @@ const DIRECTORY_MODE: Mode = Mode(0o040000);
 impl PartialTree {
     fn new() -> Self {
         Self {
-            entries: HashMap::new(),
+            entries: BTreeMap::new(),
             oid: None,
         }
     }
