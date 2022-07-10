@@ -1,5 +1,6 @@
 use crate::*;
 use std::io::{self, Write};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use tempdir::TempDir;
 

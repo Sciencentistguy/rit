@@ -3,7 +3,8 @@ use crate::Result;
 use std::{
     fs::File,
     io::{ErrorKind, Write},
-    path::{Path, PathBuf}, ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut},
+    path::{Path, PathBuf},
 };
 
 pub struct LockedFile {

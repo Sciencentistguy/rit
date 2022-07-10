@@ -1,7 +1,9 @@
+use crate::repo::*;
 use crate::*;
 use std::fs::Permissions;
 use std::io::{self, Write};
 use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
 use std::process::{Command, Stdio};
 use tempdir::TempDir;
 

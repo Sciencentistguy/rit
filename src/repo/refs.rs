@@ -1,5 +1,4 @@
 use std::io::Write;
-use std::path::{Path, PathBuf};
 
 use crate::digest::Digest;
 use crate::lock::LockedFile;
@@ -7,18 +6,7 @@ use crate::Result;
 
 use color_eyre::eyre::{eyre, Context};
 
-pub struct Refs {
-    git_dir: PathBuf,
-    head_path: PathBuf,
-}
-
-impl Refs {
-    pub fn new<P: AsRef<Path>>(root_path: P) -> Self {
-        let git_dir = root_path.as_ref().canonicalize().unwrap().join(".git");
-        let head_path = git_dir.join("HEAD");
-        Self { git_dir, head_path }
-    }
-
+impl super::Repo {
     /// Updates the value of HEAD to oid
     pub fn set_head(&self, oid: &Digest) -> Result<()> {
         // File::create(root.join(".git/HEAD"))?.write_all(commit.get_oid().lower_hex().as_bytes())?;
