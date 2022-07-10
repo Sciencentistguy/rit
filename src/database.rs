@@ -24,14 +24,16 @@ impl Database {
     }
 
     pub fn store(&self, obj: &impl Storable) -> Result<()> {
-        trace!(oid=?obj.get_oid(), "Writing file to database");
+        trace!(oid=?obj.get_oid(), "Writing object to database");
         let content = obj.formatted();
 
         let object_path = {
             let mut x = self.database_root.to_owned();
             let oid = obj.get_oid().to_hex();
-            x.push(&oid[0..2]);
-            x.push(&oid[2..]);
+            let (prefix, suffix) = oid.split_at(2);
+            debug_assert_eq!(prefix.len(), 2);
+            x.push(prefix);
+            x.push(suffix);
             x
         };
 

@@ -20,7 +20,7 @@ use crate::storable::blob::Blob;
 use crate::storable::commit::Author;
 use crate::storable::commit::Commit;
 use crate::storable::tree::Entry;
-use crate::storable::tree::Tree;
+use crate::storable::tree::PartialTree;
 use crate::storable::Storable;
 use crate::workspace::Workspace;
 
@@ -29,6 +29,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use once_cell::sync::Lazy;
+use tracing::*;
 use tracing_subscriber::prelude::*;
 
 static ARGS: Lazy<Opt> = Lazy::new(Opt::parse);
@@ -74,6 +75,7 @@ impl Repo {
         let workspace = Workspace::new(&repo_root);
         let refs = Refs::new(&repo_root);
         let database = Database::new(&repo_root);
+        trace!(path=?repo_root, "Opened repo");
         Self {
             dir: repo_root,
             workspace,
@@ -83,14 +85,22 @@ impl Repo {
     }
 
     fn init(&self) -> Result<()> {
-        let dir = self.dir.join(".git");
-        for d in ["objects", "refs"] {
-            std::fs::create_dir_all(dir.join(d))?;
+        trace!(path=?self.dir, "Initialising repo");
+        let git_dir = self.dir.join(".git");
+        if git_dir.exists() {
+            warn!("Repo already exists, init will do nothing");
+        } else {
+            for d in ["objects", "refs"] {
+                let dir = git_dir.join(d);
+                trace!(path=?dir, "Creating directory");
+                std::fs::create_dir_all(dir)?;
+            }
         }
         Ok(())
     }
 
     fn commit(&self, message: &str) -> Result<Digest> {
+        trace!(path=?self.dir, %message, "Starting commit");
         let mut entries = Vec::new();
 
         for entry in WalkDir::new(&self.dir) {
@@ -102,8 +112,8 @@ impl Repo {
             {
                 continue;
             }
+            trace!(?path, "Found entry");
             if !path.is_dir() {
-                println!("file: {:?}", path.canonicalize());
                 let data = std::fs::read(&path)?;
                 let blob = Blob::new(&data);
                 self.database.store(&blob)?;
@@ -116,13 +126,13 @@ impl Repo {
             }
         }
 
-        for entry in &entries {
-            println!("{:?}", entry.path());
-        }
+        let mut root = PartialTree::build(entries)?;
+        trace!("Traversing root");
+        root.traverse(|tree| self.database.store(&tree.freeze()))?;
 
-        let tree = Tree::build(entries)?;
-        self.database.store(&tree)?;
-        dbg!(tree.get_oid());
+        let root = root.freeze();
+
+        self.database.store(&root)?;
 
         let parent_commit = self.refs.read_head()?;
 
@@ -131,7 +141,7 @@ impl Repo {
             email: std::env::var("RIT_AUTHOR_EMAIL")?,
         };
 
-        let commit = Commit::new(parent_commit, tree.into_oid(), author, message);
+        let commit = Commit::new(parent_commit, root.into_oid(), author, message);
         self.database.store(&commit)?;
         self.refs.set_head(commit.get_oid())?;
 

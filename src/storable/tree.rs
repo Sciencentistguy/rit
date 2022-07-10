@@ -5,11 +5,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use color_eyre::eyre::eyre;
 use color_eyre::Result;
+use tracing::*;
 
 use super::Storable;
-use crate::gest;
+use crate::{util::Descends, Digest};
 
 #[derive(Clone, Copy)]
 pub struct Mode(u32);
@@ -42,22 +42,11 @@ impl Entry {
             mode: Mode(metadata.mode()),
         }
     }
-    pub fn path(&self) -> &Path {
-        &self.path
-    }
 
-    pub fn filename(&self) -> Option<&str> {
-        self.path().to_str()
-    }
-
-    fn parents(&self) -> Option<&Path> {
-        self.path.parent()
-    }
-
-    fn reduce_path(&mut self) {
-        let mut it = self.path.iter();
-        it.next();
-        self.path = it.as_path().to_owned();
+    fn parents(&self) -> Vec<&Path> {
+        let mut v = self.path.descends();
+        v.pop();
+        v
     }
 }
 
@@ -66,136 +55,155 @@ pub struct Tree {
     oid: Digest,
 }
 
-impl Tree {
-    pub fn new(mut entries: Vec<Entry>) -> Self {
-        entries.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+// impl Tree {
+    // pub fn new(mut entries: Vec<Entry>) -> Self {
+        // entries.sort_unstable_by(|a, b| a.path.cmp(&b.path));
 
-        let mut data = Vec::new();
-        for entry in &entries {
-            let mode = format!("{:o}", entry.mode);
-            data.extend_from_slice(mode.as_bytes());
-            data.push(b' ');
-            data.extend_from_slice(entry.path.as_os_str().as_bytes());
-            data.push(b'\0');
-            data.extend_from_slice(&*entry.oid);
+        // let mut data = Vec::new();
+        // for entry in &entries {
+            // let mode = format!("{:o}", entry.mode);
+            // data.extend_from_slice(mode.as_bytes());
+            // data.push(b' ');
+            // data.extend_from_slice(entry.path.as_os_str().as_bytes());
+            // data.push(b'\0');
+            // data.extend_from_slice(&*entry.oid);
+        // }
+
+        // let mut formatted = Vec::new();
+        // formatted.extend_from_slice(b"tree ");
+        // formatted.extend_from_slice(format!("{}", data.len()).as_bytes());
+        // formatted.push(b'\0');
+        // formatted.extend_from_slice(&data);
+        // let oid = Digest::new(&formatted);
+
+        // Self { formatted, oid }
+    // }
+
+    // pub fn build(entries: Vec<Entry>) -> Result<Self> {
+        // trace!("Building tree of entries");
+        // let pt = PartialTree::build(entries)?;
+        // trace!(tree = ?pt, "Finished building tree");
+        // let t = pt.freeze();
+        // todo!();
+        // // Ok()
+    // }
+// }
+
+#[derive(Debug)]
+enum PartialTreeEntry {
+    File(Entry),
+    Directory(PartialTree),
+}
+
+impl PartialTreeEntry {
+    fn mode(&self) -> Mode {
+        match self {
+            PartialTreeEntry::File(f) => f.mode,
+            PartialTreeEntry::Directory(_) => DIRECTORY_MODE,
         }
+    }
+}
 
+#[derive(Debug)]
+pub struct PartialTree {
+    entries: HashMap<String, PartialTreeEntry>,
+    oid: Option<Digest>,
+}
+
+const DIRECTORY_MODE: Mode = Mode(0o040000);
+
+impl PartialTree {
+    fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+            oid: None,
+        }
+    }
+
+    pub fn freeze(&mut self) -> Tree {
+        let mut data = Vec::new();
+        for (name, entry) in self.entries.iter() {
+            data.extend_from_slice(format!("{:o}", entry.mode()).as_bytes());
+            data.push(b' ');
+            data.extend_from_slice(name.as_bytes());
+            data.push(b'\0');
+            let oid = match entry {
+                PartialTreeEntry::File(f) => &f.oid,
+                PartialTreeEntry::Directory(d) => {
+                    d.oid.as_ref().expect("subtree oid should have been inited")
+                }
+            };
+            data.extend_from_slice(&**oid);
+        }
         let mut formatted = Vec::new();
         formatted.extend_from_slice(b"tree ");
         formatted.extend_from_slice(format!("{}", data.len()).as_bytes());
         formatted.push(b'\0');
         formatted.extend_from_slice(&data);
         let oid = Digest::new(&formatted);
+        self.oid = Some(oid.clone());
 
-        Self { formatted, oid }
+        Tree { formatted, oid }
     }
 
-    pub fn build(entries: Vec<Entry>) -> Result<Self> {
-        let _ = PartialTree::build(entries)?.freeze();
-        todo!();
-        // Ok()
-    }
-}
-
-#[derive(Debug)]
-enum V {
-    Entry(Entry),
-    Tree(PartialTree),
-}
-
-impl V {
-    fn tree(name: String) -> Self {
-        Self::Tree(PartialTree::new(name))
-    }
-}
-
-#[derive(Debug)]
-struct PartialTree {
-    name: String,
-    entries: HashMap<String, V>,
-}
-
-impl PartialTree {
-    fn new(name: String) -> Self {
-        Self {
-            name,
-            entries: HashMap::new(),
-        }
-    }
-
-    fn freeze(&self) {
-        for it in self.entries.values() {
-            match it {
-                V::Tree(tree) => {
-                    tree.freeze();
-                    println!("storing tree {:?}", tree);
-                }
-                V::Entry(entry) => {
-                    println!("storing file {:?}", entry);
-
-                    assert!(entry.path.is_file());
-
-                    let blob = Blob::new(data);
-
-                }
-            }
-        }
-    }
-
-    fn build(mut entries: Vec<Entry>) -> Result<PartialTree> {
+    pub fn build(mut entries: Vec<Entry>) -> Result<PartialTree> {
         entries.sort_unstable_by(|a, b| a.path.cmp(&b.path));
-        let mut root = PartialTree {
-            name: "root".to_owned(),
-            entries: HashMap::new(),
-        };
+        let mut root = PartialTree::new();
 
         for entry in entries {
-            println!("doing entry {:?}", entry.path());
-            let mut parents = entry.parents().map(|x| x.to_owned());
-            if parents.as_deref() == Some(Path::new("")) {
-                parents = None;
-            }
-            root.add_entry(parents.as_deref(), entry)?;
+            trace!(?entry, "Inserting entry into tree");
+            let parents = entry.parents();
+            trace!(?parents, "Parents of entry");
+            root.add_entry(&parents, &entry)?;
         }
 
         Ok(root)
     }
 
-    // XXX this should not take parents and also entry, parents can be gotten from entry
-    fn add_entry(&mut self, parents: Option<&Path>, mut entry: Entry) -> Result<()> {
-        match parents {
-            None => {
-                self.entries.insert(
-                    entry.filename().unwrap().to_owned(),
-                    V::Entry(entry.clone()),
-                );
+    pub fn traverse<F>(&mut self, f: F) -> Result<()>
+    where
+        F: Fn(&mut Self) -> Result<()> + Copy,
+    {
+        for (name, entry) in self.entries.iter_mut() {
+            if let PartialTreeEntry::Directory(entry) = entry {
+                trace!(%name, "Traversing subtree");
+                entry.traverse(f)?;
             }
-            Some(parents) => {
-                let basename = parents
-                    .components()
-                    .next()
-                    .ok_or_else(|| eyre!("parents of '{:?}' was Some(empty)", entry.path()))?
-                    .as_os_str()
-                    .to_str()
-                    .ok_or(eyre!("non-unicode path"))?
-                    .to_owned();
-                let tree = self
-                    .entries
-                    .entry(basename.clone())
-                    .or_insert_with(|| V::tree(basename));
-                let tree = match tree {
-                    V::Entry(_) => {
-                        unreachable!("tree for '{:?}' should be tree not entry", entry.path())
-                    }
-                    V::Tree(x) => x,
-                };
+        }
+        f(self)
+    }
 
-                let t = parents.strip_prefix(&tree.name)?;
+    fn add_entry(&mut self, parents: &[&'_ Path], entry: &Entry) -> Result<()> {
+        if parents.is_empty() {
+            let filename = entry
+                .path
+                .file_name()
+                .expect("Entry with no parents must have a filename")
+                .to_str()
+                .expect("file name should be utf-8");
+            let filename = filename;
+            self.entries
+                .insert(filename.to_owned(), PartialTreeEntry::File(entry.clone()));
+        } else {
+            let tree = PartialTree::new();
+            let tree = self
+                .entries
+                .entry(
+                    parents[0]
+                        .file_name()
+                        .expect("should have a file name")
+                        .to_str()
+                        .expect("file name should be utf-8")
+                        .to_owned(),
+                )
+                .or_insert(PartialTreeEntry::Directory(tree));
+            let tree = match tree {
+                PartialTreeEntry::Directory(tree) => tree,
+                _ => unreachable!("entry should be a tree"),
+            };
 
-                entry.reduce_path();
-
-                tree.add_entry(if t == Path::new("") { None } else { Some(t) }, entry)?;
-            }
+            trace!(?parents, "Recursing...");
+            tree.add_entry(&parents[1..], entry)?;
         }
         Ok(())
     }

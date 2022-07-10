@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use rand::prelude::*;
 
 pub fn tmp_file_name() -> String {
@@ -19,4 +21,17 @@ pub fn tmp_file_name() -> String {
         ALPHANUM_CHARS.choose(&mut rng).unwrap(),
         ALPHANUM_CHARS.choose(&mut rng).unwrap(),
     )
+}
+
+pub trait Descends {
+    fn descends(&self) -> Vec<&Path>;
+}
+
+impl Descends for Path {
+    fn descends(&self) -> Vec<&Path> {
+        let mut descends: Vec<_> = self.ancestors().collect();
+        let _ = descends.pop();
+        descends.reverse();
+        descends
+    }
 }
