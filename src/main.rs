@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+#[cfg(test)]
+mod test;
+
 mod database;
 mod digest;
 mod interface;
@@ -148,6 +151,3 @@ impl Repo {
         Ok(commit.into_oid())
     }
 }
-
-#[cfg(test)]
-mod test;
