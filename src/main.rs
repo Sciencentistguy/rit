@@ -32,10 +32,6 @@ use once_cell::sync::Lazy;
 use tracing_subscriber::prelude::*;
 
 static ARGS: Lazy<Opt> = Lazy::new(Opt::parse);
-static ROOT: Lazy<PathBuf> = Lazy::new(|| match &ARGS.path {
-    Some(x) => x.clone(),
-    None => std::env::current_dir().expect("Process has no directory :thonk:"),
-});
 
 fn main() -> Result<()> {
     color_eyre::install().unwrap();
@@ -47,11 +43,15 @@ fn main() -> Result<()> {
 
     Lazy::force(&ARGS);
 
+    let repo = match ARGS.path {
+        Some(ref path) => Repo::new(path.clone()),
+        None => Repo::new(std::env::current_dir()?),
+    };
+
     match &ARGS.command {
-        Command::Init => init(&*ROOT)?,
+        Command::Init => repo.init()?,
         Command::Commit { message } => {
-            let commit_id = commit(
-                &*ROOT,
+            let commit_id = repo.commit(
                 message
                     .as_deref()
                     .expect("Using an editor for commit message is currently unimplemented"),
@@ -62,79 +62,88 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn open_repo<P: AsRef<Path>>(repo_root: P) -> (Workspace, Refs, Database) {
-    let repo_root = repo_root.as_ref();
-    let workspace = Workspace::new(repo_root);
-    let refs = Refs::new(repo_root);
-    let database = Database::new(repo_root);
-    (workspace, refs, database)
+struct Repo {
+    dir: PathBuf,
+    workspace: Workspace,
+    refs: Refs,
+    database: Database,
 }
 
-fn init<P: AsRef<Path>>(repo_root: P) -> Result<()> {
-    let dir = repo_root.as_ref().join(".git");
-    for d in ["objects", "refs"] {
-        std::fs::create_dir_all(dir.join(d))?;
-    }
-    Ok(())
-}
-
-fn commit<P: AsRef<Path>>(repo_root: P, message: &str) -> Result<Digest> {
-    let repo_root = repo_root.as_ref();
-
-    let (workspace, refs, database) = open_repo(repo_root);
-
-    let mut entries = Vec::new();
-
-    for entry in WalkDir::new(repo_root) {
-        let entry = entry?;
-        let path = entry.path();
-        if path
-            .components()
-            .any(|c| AsRef::<Path>::as_ref(&c) == Path::new(".git"))
-        {
-            continue;
-        }
-        if !path.is_dir() {
-            println!("file: {:?}", path.canonicalize());
-            let data = std::fs::read(&path)?;
-            let blob = Blob::new(&data);
-            database.store(&blob)?;
-            let metadata = std::fs::metadata(&path)?;
-            entries.push(Entry::new(
-                path.strip_prefix(repo_root)?.to_owned(),
-                blob.into_oid(),
-                metadata,
-            ));
+impl Repo {
+    fn new(repo_root: PathBuf) -> Self {
+        let workspace = Workspace::new(&repo_root);
+        let refs = Refs::new(&repo_root);
+        let database = Database::new(&repo_root);
+        Self {
+            dir: repo_root,
+            workspace,
+            refs,
+            database,
         }
     }
 
-    for entry in &entries {
-        println!("{:?}", entry.path());
+    fn init(&self) -> Result<()> {
+        let dir = self.dir.join(".git");
+        for d in ["objects", "refs"] {
+            std::fs::create_dir_all(dir.join(d))?;
+        }
+        Ok(())
     }
 
-    let tree = Tree::build(entries)?;
-    database.store(&tree)?;
-    dbg!(tree.get_oid());
+    fn commit(&self, message: &str) -> Result<Digest> {
+        let mut entries = Vec::new();
 
-    let parent_commit = refs.read_head()?;
+        for entry in WalkDir::new(&self.dir) {
+            let entry = entry?;
+            let path = entry.path();
+            if path
+                .components()
+                .any(|c| AsRef::<Path>::as_ref(&c) == Path::new(".git"))
+            {
+                continue;
+            }
+            if !path.is_dir() {
+                println!("file: {:?}", path.canonicalize());
+                let data = std::fs::read(&path)?;
+                let blob = Blob::new(&data);
+                self.database.store(&blob)?;
+                let metadata = std::fs::metadata(&path)?;
+                entries.push(Entry::new(
+                    path.strip_prefix(&self.dir)?.to_owned(),
+                    blob.into_oid(),
+                    metadata,
+                ));
+            }
+        }
 
-    let author = Author {
-        name: std::env::var("RIT_AUTHOR_NAME")?,
-        email: std::env::var("RIT_AUTHOR_EMAIL")?,
-    };
+        for entry in &entries {
+            println!("{:?}", entry.path());
+        }
 
-    let commit = Commit::new(parent_commit, tree.into_oid(), author, message);
-    database.store(&commit)?;
-    refs.set_head(commit.get_oid())?;
+        let tree = Tree::build(entries)?;
+        self.database.store(&tree)?;
+        dbg!(tree.get_oid());
 
-    Ok(commit.into_oid())
+        let parent_commit = self.refs.read_head()?;
+
+        let author = Author {
+            name: std::env::var("RIT_AUTHOR_NAME")?,
+            email: std::env::var("RIT_AUTHOR_EMAIL")?,
+        };
+
+        let commit = Commit::new(parent_commit, tree.into_oid(), author, message);
+        self.database.store(&commit)?;
+        self.refs.set_head(commit.get_oid())?;
+
+        Ok(commit.into_oid())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs::Permissions;
-    use std::io::Write;
+    use std::io::{self, Write};
     use std::os::unix::fs::PermissionsExt;
     use std::process::{Command, Stdio};
     use tempdir::TempDir;
@@ -142,7 +151,8 @@ mod tests {
     #[test]
     fn rit_init() -> Result<()> {
         let dir = TempDir::new("")?;
-        super::init(&dir)?;
+        let repo = Repo::new(dir.path().to_owned());
+        repo.init()?;
 
         let git_dir = dir.as_ref().join(".git");
         let obj_dir = git_dir.join("objects");
@@ -157,10 +167,16 @@ mod tests {
 
     #[test]
     fn rit_commit() -> Result<()> {
+        fn write_test_files(path: &Path) -> io::Result<()> {
+            writeln!(std::fs::File::create(path.join("file1"))?, "hello")?;
+            writeln!(std::fs::File::create(path.join("file2"))?, "world")?;
+            std::fs::set_permissions(path.join("file2"), Permissions::from_mode(0o100755))?;
+            Ok(())
+        }
         let dir_rit = TempDir::new("")?;
-        let dir_rit = dir_rit.as_ref();
+        let dir_rit = dir_rit.path();
         let dir_git = TempDir::new("")?;
-        let dir_git = dir_git.as_ref();
+        let dir_git = dir_git.path();
 
         const COMMIT_NAME: &str = "Jamie Quigley";
         const COMMIT_EMAIL: &str = "jamie@quigley.xyz";
@@ -177,19 +193,21 @@ mod tests {
             "commit.gpgsign=false",
         ];
 
-        // Rit create files
-        crate::init(&dir_rit)?;
-        writeln!(std::fs::File::create(dir_rit.join("file1"))?, "hello")?;
-        writeln!(std::fs::File::create(dir_rit.join("file2"))?, "world")?;
-        std::fs::set_permissions(dir_rit.join("file2"), Permissions::from_mode(0o100755))?;
-        let commit_id = crate::commit(&dir_rit, "test")?;
+        let rit_repo = Repo::new(dir_rit.to_owned());
 
-        let _ = Command::new("git")
+        // Rit create files
+        rit_repo.init()?;
+        // create test files
+        write_test_files(dir_rit)?;
+        let commit_id = rit_repo.commit("test")?;
+
+        Command::new("git")
             .args(&git_command_args)
             .arg("init")
             .current_dir(&dir_git)
             .stdout(Stdio::null())
-            .status()?;
+            .status()
+            .unwrap();
 
         writeln!(std::fs::File::create(dir_git.join("file1"))?, "hello")?;
         writeln!(std::fs::File::create(dir_git.join("file2"))?, "world")?;

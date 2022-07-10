@@ -7,7 +7,7 @@ use clap::Subcommand;
 pub enum Command {
     Init,
     Commit {
-        #[clap(short, long)]
+        #[clap(short, long, env = "RIT_COMMIT_MESSAGE")]
         message: Option<String>,
     },
 }

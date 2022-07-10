@@ -9,7 +9,7 @@ use color_eyre::eyre::eyre;
 use color_eyre::Result;
 
 use super::Storable;
-use crate::digest::Digest;
+use crate::gest;
 
 #[derive(Clone, Copy)]
 pub struct Mode(u32);
@@ -132,6 +132,11 @@ impl PartialTree {
                 }
                 V::Entry(entry) => {
                     println!("storing file {:?}", entry);
+
+                    assert!(entry.path.is_file());
+
+                    let blob = Blob::new(data);
+
                 }
             }
         }
