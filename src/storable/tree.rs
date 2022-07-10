@@ -1,7 +1,6 @@
 use std::{
     collections::BTreeMap,
     fs::Metadata,
-    io::Write,
     os::unix::prelude::*,
     path::{Path, PathBuf},
 };
@@ -13,9 +12,9 @@ use super::Storable;
 use crate::{util::Descends, Digest};
 
 #[derive(Clone, Copy)]
-pub struct Mode(u32);
+pub struct FileMode(u32);
 
-impl std::fmt::Octal for Mode {
+impl std::fmt::Octal for FileMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:o}", self.0)
     }
@@ -25,7 +24,7 @@ impl std::fmt::Octal for Mode {
 pub struct Entry {
     path: PathBuf,
     oid: Digest,
-    mode: Mode,
+    mode: FileMode,
 }
 
 impl std::fmt::Debug for Entry {
@@ -40,7 +39,7 @@ impl Entry {
             path: filename,
             oid,
             //FIXME: unix-specific
-            mode: Mode(metadata.mode()),
+            mode: FileMode(metadata.mode()),
         }
     }
 
@@ -97,7 +96,7 @@ enum PartialTreeEntry {
 }
 
 impl PartialTreeEntry {
-    fn mode(&self) -> Mode {
+    fn mode(&self) -> FileMode {
         match self {
             PartialTreeEntry::File(f) => f.mode,
             PartialTreeEntry::Directory(_) => DIRECTORY_MODE,
@@ -111,7 +110,7 @@ pub struct PartialTree {
     oid: Option<Digest>,
 }
 
-const DIRECTORY_MODE: Mode = Mode(0o040000);
+const DIRECTORY_MODE: FileMode = FileMode(0o040000);
 
 impl PartialTree {
     fn new() -> Self {
