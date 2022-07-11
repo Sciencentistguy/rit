@@ -12,7 +12,10 @@ fn commit() -> Result<()> {
     fn write_test_files(path: &Path) -> io::Result<()> {
         writeln!(std::fs::File::create(path.join("file1"))?, "hello")?;
         writeln!(std::fs::File::create(path.join("file2"))?, "world")?;
+        writeln!(std::fs::File::create(path.join("file3"))?, "world")?;
         std::fs::set_permissions(path.join("file2"), Permissions::from_mode(0o100755))?;
+        // Git should store this as 0o644
+        std::fs::set_permissions(path.join("file3"), Permissions::from_mode(0o100655))?;
         Ok(())
     }
     let dir_rit = TempDir::new("")?;
@@ -71,7 +74,7 @@ fn commit() -> Result<()> {
 
     let rit_dir = dir_rit.join(".git");
     let file1_path = Path::new("objects/cc/628ccd10742baea8241c5924df992b5c019f71");
-    let tree_path = Path::new("objects/b0/30fc230ce2ccfe74eeec1617105b26311f0e4a");
+    let tree_path = Path::new("objects/f1/301392513b517dd97c2d06d022e17f9bdfa6a3");
     assert!(rit_dir.join(file1_path).exists());
 
     let git_dir = dir_git.join(".git");
@@ -97,12 +100,29 @@ fn commit() -> Result<()> {
 
     if let [tree, _, _, _, msg] = generated_commit.lines().collect::<Vec<_>>()[..] {
         assert_eq!(
-            tree, "tree b030fc230ce2ccfe74eeec1617105b26311f0e4a",
+            tree, "tree f1301392513b517dd97c2d06d022e17f9bdfa6a3",
             "Tree OID in commit did not match"
         );
         assert_eq!(msg, "test", "Commit message did not match");
+        let generated_tree = String::from_utf8(
+            Command::new("git")
+                .arg("cat-file")
+                .arg("-p")
+                .arg(&tree[5..])
+                .current_dir(&dir_rit)
+                .output()?
+                .stdout,
+        )
+        .unwrap();
+
+        let file3_line = generated_tree.lines().nth(2).unwrap();
+        let file3_line = file3_line.trim();
+
+        assert!(file3_line.ends_with("file3"));
+        assert_eq!(&file3_line[..6], "100644");
     } else {
         panic!("Invalid commit: {}", generated_commit);
     }
+
     Ok(())
 }
