@@ -9,16 +9,7 @@ use color_eyre::Result;
 use tracing::*;
 
 use super::Storable;
-use crate::{util::Descends, Digest};
-
-#[derive(Clone, Copy)]
-pub struct FileMode(u32);
-
-impl std::fmt::Octal for FileMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:o}", self.0)
-    }
-}
+use crate::{filemode::FileMode, util::Descends, Digest};
 
 #[derive(Clone)]
 pub struct Entry {
@@ -35,11 +26,16 @@ impl std::fmt::Debug for Entry {
 
 impl Entry {
     pub fn new(filename: PathBuf, oid: Digest, metadata: Metadata) -> Self {
+        let mode = if FileMode(metadata.mode()).is_executable() {
+            FileMode::EXECUTABLE
+        } else {
+            FileMode::REGULAR
+        };
+
         Self {
             path: filename,
             oid,
-            //FIXME: unix-specific
-            mode: FileMode(metadata.mode()),
+            mode,
         }
     }
 
@@ -65,7 +61,7 @@ impl PartialTreeEntry {
     fn mode(&self) -> FileMode {
         match self {
             PartialTreeEntry::File(f) => f.mode,
-            PartialTreeEntry::Directory(_) => DIRECTORY_MODE,
+            PartialTreeEntry::Directory(_) => FileMode::DIRECTORY,
         }
     }
 }
@@ -75,8 +71,6 @@ pub struct PartialTree {
     entries: BTreeMap<String, PartialTreeEntry>,
     oid: Option<Digest>,
 }
-
-const DIRECTORY_MODE: FileMode = FileMode(0o040000);
 
 impl PartialTree {
     fn new() -> Self {

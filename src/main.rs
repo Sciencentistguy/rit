@@ -7,6 +7,7 @@ mod lock;
 mod repo;
 mod storable;
 mod util;
+mod filemode;
 
 pub use color_eyre::Result;
 
