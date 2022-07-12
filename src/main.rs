@@ -46,6 +46,10 @@ fn main() -> Result<()> {
             )?;
             println!("Created commit {}", commit_id.to_hex())
         }
+        Command::Add { path } => {
+            repo.add(path)?;
+            todo!()
+        }
     }
     Ok(())
 }

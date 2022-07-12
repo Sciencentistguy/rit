@@ -1,18 +1,16 @@
 mod database;
+mod index;
 mod refs;
-
-use walkdir::WalkDir;
+mod workspace;
 
 use database::Database;
+// use index::Index;
 
-use crate::digest::Digest;
-use crate::storable::blob::Blob;
-use crate::storable::commit::Author;
-use crate::storable::commit::Commit;
-use crate::storable::tree::Entry;
-use crate::storable::tree::PartialTree;
-use crate::storable::Storable;
-use crate::Result;
+use crate::{
+    digest::Digest,
+    storable::{blob::Blob, commit::Author, commit::Commit, tree::PartialTree, Storable},
+    Result,
+};
 
 use std::path::Path;
 use std::path::PathBuf;
@@ -23,17 +21,20 @@ pub struct Repo {
     dir: PathBuf,
     head_path: PathBuf,
     database: Database,
+    // index: Index,
 }
 
 impl Repo {
     pub fn new(repo_root: PathBuf) -> Self {
         let database = Database::new(&repo_root);
+        // let index = Index::new(&repo_root);
         trace!(path=?repo_root, "Opened repo");
         let head_path = repo_root.join(".git/HEAD");
         Self {
             dir: repo_root,
             head_path,
             database,
+            // index,
         }
     }
 
@@ -76,35 +77,19 @@ impl Repo {
 
         Ok(commit.into_oid())
     }
-}
 
-// Workspace
-impl Repo {
-    fn list_files(&self) -> Result<Vec<Entry>> {
-        let mut entries = Vec::new();
+    pub fn add(&self, path: &Path) -> Result<()> {
+        trace!(?path, "Adding file");
 
-        for entry in WalkDir::new(&self.dir) {
-            let entry = entry?;
-            let path = entry.path();
-            if path
-                .components()
-                .any(|c| AsRef::<Path>::as_ref(&c) == Path::new(".git"))
-            {
-                continue;
-            }
-            trace!(?path, "Found entry");
-            if !path.is_dir() {
-                let data = std::fs::read(&path)?;
-                let blob = Blob::new(&data);
-                self.database.store(&blob)?;
-                let metadata = std::fs::metadata(&path)?;
-                entries.push(Entry::new(
-                    path.strip_prefix(&self.dir)?.to_owned(),
-                    blob.into_oid(),
-                    metadata,
-                ));
-            }
-        }
-        Ok(entries)
+        let data = std::fs::read(path)?;
+        let stat = Self::stat_file(path);
+        // let index = todo!();
+
+        // let blob = Blob::new(&data);
+        // self.database.store(&blob)?;
+        // index.add(path, blob.oid, stat);
+        // index.write_updates();
+
+        todo!()
     }
 }
