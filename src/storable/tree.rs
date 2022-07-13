@@ -9,7 +9,7 @@ use color_eyre::Result;
 use tracing::*;
 
 use super::Storable;
-use crate::{filemode::FileMode, util::Descends, Digest};
+use crate::{filemode::FileMode, repo::index::IndexEntry, util::Descends, Digest};
 
 #[derive(Clone)]
 pub struct Entry {
@@ -38,12 +38,6 @@ impl Entry {
             mode,
         }
     }
-
-    fn parents(&self) -> Vec<&Path> {
-        let mut v = self.path.descends();
-        v.pop();
-        v
-    }
 }
 
 pub struct Tree {
@@ -53,14 +47,14 @@ pub struct Tree {
 
 #[derive(Debug)]
 enum PartialTreeEntry {
-    File(Entry),
+    File(IndexEntry),
     Directory(PartialTree),
 }
 
 impl PartialTreeEntry {
     fn mode(&self) -> FileMode {
         match self {
-            PartialTreeEntry::File(f) => f.mode,
+            PartialTreeEntry::File(f) => f.mode(),
             PartialTreeEntry::Directory(_) => FileMode::DIRECTORY,
         }
     }
@@ -88,7 +82,7 @@ impl PartialTree {
             data.extend_from_slice(name.as_bytes());
             data.push(b'\0');
             let oid = match entry {
-                PartialTreeEntry::File(f) => &f.oid,
+                PartialTreeEntry::File(f) => &f.oid(),
                 PartialTreeEntry::Directory(d) => {
                     d.oid.as_ref().expect("subtree oid should have been inited")
                 }
@@ -106,15 +100,14 @@ impl PartialTree {
         Tree { formatted, oid }
     }
 
-    pub fn build(mut entries: Vec<Entry>) -> Result<PartialTree> {
-        entries.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+    pub fn build(entries: &[IndexEntry]) -> Result<PartialTree> {
         let mut root = PartialTree::new();
 
         for entry in entries {
-            trace!(?entry, "Inserting entry into tree");
+            trace!(entry=?std::str::from_utf8(entry.name()), "Inserting entry into tree");
             let parents = entry.parents();
             trace!(?parents, "Parents of entry");
-            root.add_entry(&parents, &entry)?;
+            root.add_entry(&parents, entry)?;
         }
 
         Ok(root)
@@ -133,10 +126,10 @@ impl PartialTree {
         f(self)
     }
 
-    fn add_entry(&mut self, parents: &[&'_ Path], entry: &Entry) -> Result<()> {
+    fn add_entry(&mut self, parents: &[&'_ Path], entry: &IndexEntry) -> Result<()> {
         if parents.is_empty() {
             let filename = entry
-                .path
+                .path()
                 .file_name()
                 .expect("Entry with no parents must have a filename")
                 .to_str()

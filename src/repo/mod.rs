@@ -1,5 +1,5 @@
 mod database;
-mod index;
+pub mod index;
 mod refs;
 mod workspace;
 
@@ -56,7 +56,7 @@ impl Repo {
 
     pub fn commit(&mut self, message: &str) -> Result<Digest> {
         trace!(path=?self.dir, %message, "Starting commit");
-        let entries = self.create_entries()?;
+        let entries = &self.index.entries();
         let mut root = PartialTree::build(entries)?;
         trace!("Traversing root");
         root.traverse(|tree| self.database.store(&tree.freeze()))?;

@@ -37,6 +37,7 @@ pub(super) fn rit_commit_hierarchy() -> Result<()> {
     rit_repo.init()?;
     // create test files
     write_test_files(dir_rit)?;
+    rit_repo.add(&[".".into()])?;
     let commit_id = rit_repo.commit("test")?;
 
     Command::new("git")

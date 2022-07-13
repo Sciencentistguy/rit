@@ -1,6 +1,7 @@
 mod parse;
 mod write;
 
+use std::ffi::OsStr;
 use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
 
@@ -8,6 +9,7 @@ use tracing::trace;
 
 use crate::digest::Digest;
 use crate::filemode::FileMode;
+use crate::util::Descends;
 use crate::Result;
 
 struct IndexHeader {
@@ -22,8 +24,8 @@ impl IndexHeader {
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
-struct IndexEntry {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct IndexEntry {
     ctime_s: u32,
     ctime_n: u32,
 
@@ -93,6 +95,28 @@ impl IndexEntry {
             flags,
             name,
         })
+    }
+
+    pub fn name(&self) -> &[u8] {
+        self.name.as_ref()
+    }
+
+    pub fn path(&self) -> &Path {
+        Path::new(OsStr::from_bytes(self.name.as_ref()))
+    }
+
+    pub fn parents(&self) -> Vec<&Path> {
+        let mut v = self.path().descends();
+        v.pop();
+        v
+    }
+
+    pub fn mode(&self) -> FileMode {
+        self.mode
+    }
+
+    pub fn oid(&self) -> &Digest {
+        &self.oid
     }
 }
 
@@ -164,6 +188,10 @@ impl IndexWrapper {
         let index = write::write_index(&index);
         std::fs::write(&self.path, index)?;
         Ok(())
+    }
+
+    pub fn entries(&self) -> &[IndexEntry] {
+        &self.entries
     }
 }
 
