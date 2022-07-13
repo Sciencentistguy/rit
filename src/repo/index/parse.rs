@@ -1,7 +1,7 @@
 use tracing::{trace, warn};
 
 use super::{Index, IndexEntry, IndexHeader};
-use crate::util::align_to_n;
+use crate::util::align_to;
 use crate::Digest;
 
 pub(super) fn parse_index(bytes: &[u8]) -> Index {
@@ -96,7 +96,7 @@ fn parse_index_entry(offset: &mut usize, bytes: &[u8]) -> IndexEntry {
     };
 
     // Pad the end of the name with NUL bytes to align the next entry to multiples of 8
-    *offset = align_to_n::<8>(*offset);
+    *offset = align_to(8, *offset);
 
     IndexEntry {
         ctime_s,

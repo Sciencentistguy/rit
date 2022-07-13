@@ -1,13 +1,18 @@
+use tracing::trace;
+
 use super::{Index, IndexEntry, IndexHeader};
 use crate::Digest;
 
 pub(super) fn write_index(index: &Index) -> Vec<u8> {
+    trace!("Writing index to bytes...");
     let mut out = Vec::new();
     write_index_header(&index.header, &mut out);
 
+    trace!("Writing index entries...");
     for entry in &index.entries {
         write_index_entry(entry, &mut out);
     }
+    trace!("Writing index entries... done");
 
     let oid = Digest::new(&out);
     // XXX: Should probably store + verify the oid at some point
@@ -22,13 +27,16 @@ pub(super) fn write_index(index: &Index) -> Vec<u8> {
 
     out.extend_from_slice(&oid.0);
 
+    trace!("Writing index to bytes... done");
     out
 }
 
 fn write_index_header(hdr: &IndexHeader, dest: &mut Vec<u8>) {
+    trace!("Writing index header...");
     dest.extend_from_slice(&hdr.magic);
     dest.extend_from_slice(&hdr.version.to_be_bytes());
     dest.extend_from_slice(&hdr.num_entries.to_be_bytes());
+    trace!("Writing index header... done");
 }
 
 fn write_index_entry(

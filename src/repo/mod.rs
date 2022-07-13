@@ -12,7 +12,6 @@ use crate::{
     Result,
 };
 
-use std::path::Path;
 use std::path::PathBuf;
 
 use tracing::*;
@@ -27,10 +26,10 @@ pub struct Repo {
 }
 
 impl Repo {
-    pub fn new(repo_root: PathBuf) -> Self {
+    pub fn open(repo_root: PathBuf) -> Self {
+        trace!(path=?repo_root, "Opening repo");
         let database = Database::new(&repo_root);
         let index = IndexWrapper::open(&repo_root);
-        trace!(path=?repo_root, "Opened repo");
         let head_path = repo_root.join(".git/HEAD");
         Self {
             dir: repo_root,
@@ -57,7 +56,7 @@ impl Repo {
 
     pub fn commit(&mut self, message: &str) -> Result<Digest> {
         trace!(path=?self.dir, %message, "Starting commit");
-        let entries = self.list_files()?;
+        let entries = self.create_entries()?;
         let mut root = PartialTree::build(entries)?;
         trace!("Traversing root");
         root.traverse(|tree| self.database.store(&tree.freeze()))?;
@@ -80,17 +79,21 @@ impl Repo {
         Ok(commit.into_oid())
     }
 
-    pub fn add(&mut self, path: &Path) -> Result<()> {
-        trace!(?path, "Adding file");
+    pub fn add(&mut self, paths: &[PathBuf]) -> Result<()> {
+        for path in paths {
+            let paths = self.list_files(path)?;
+            for path in paths {
+                trace!(?path, "Adding file");
+                let abs_path = self.dir.join(&path);
 
-        let abs_path = self.dir.join(path);
+                let data = std::fs::read(&abs_path)?;
+                let stat = Self::stat_file(&abs_path);
 
-        let data = std::fs::read(&abs_path)?;
-        let stat = Self::stat_file(&abs_path);
-
-        let blob = Blob::new(&data);
-        self.database.store(&blob)?;
-        self.index.add(path, blob.get_oid(), stat);
+                let blob = Blob::new(&data);
+                self.database.store(&blob)?;
+                self.index.add(&path, blob.get_oid(), stat);
+            }
+        }
         self.index.write_out()?;
 
         Ok(())

@@ -2,12 +2,12 @@
 mod test;
 
 mod digest;
+mod filemode;
 mod interface;
 mod lock;
 mod repo;
 mod storable;
 mod util;
-mod filemode;
 
 pub use color_eyre::Result;
 
@@ -32,8 +32,8 @@ fn main() -> Result<()> {
     Lazy::force(&ARGS);
 
     let mut repo = match ARGS.path {
-        Some(ref path) => Repo::new(path.clone()),
-        None => Repo::new(std::env::current_dir()?),
+        Some(ref path) => Repo::open(path.canonicalize()?),
+        None => Repo::open(std::env::current_dir()?.canonicalize()?),
     };
 
     match &ARGS.command {

@@ -36,12 +36,12 @@ impl Descends for Path {
     }
 }
 
-pub fn align_to_n<const N: usize>(num: usize) -> usize {
-    let extra = num % N;
+pub fn align_to(n: usize, num: usize) -> usize {
+    let extra = num % n;
     match extra {
         0 => num,
         extra => {
-            let padsize = 8 - extra;
+            let padsize = n - extra;
             num + padsize
         }
     }
@@ -54,8 +54,8 @@ mod tests {
     #[test]
     fn test_align_to_8() {
         for i in 1..9 {
-            assert_eq!(align_to_n::<8>(i), 8);
+            assert_eq!(align_to(8, i), 8);
         }
-        assert!((0..64).map(align_to_n::<8>).all(|x| x % 8 == 0));
+        assert!((0..64).map(|i| align_to(8, i)).all(|x| x % 8 == 0));
     }
 }

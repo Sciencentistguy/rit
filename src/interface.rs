@@ -11,8 +11,8 @@ pub enum Command {
         message: Option<String>,
     },
     Add {
-        #[clap(env = "RIT_ADD_PATH")]
-        path: PathBuf,
+        #[clap(env = "RIT_ADD_PATH", multiple_values = true)]
+        path: Vec<PathBuf>,
     },
 }
 
