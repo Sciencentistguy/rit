@@ -35,3 +35,27 @@ impl Descends for Path {
         descends
     }
 }
+
+pub fn align_to_n<const N: usize>(num: usize) -> usize {
+    let extra = num % N;
+    match extra {
+        0 => num,
+        extra => {
+            let padsize = 8 - extra;
+            num + padsize
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_align_to_8() {
+        for i in 1..9 {
+            assert_eq!(align_to_n::<8>(i), 8);
+        }
+        assert!((0..64).map(align_to_n::<8>).all(|x| x % 8 == 0));
+    }
+}
