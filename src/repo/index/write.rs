@@ -3,7 +3,7 @@ use tracing::warn;
 use super::{Index, IndexEntry, IndexHeader};
 use crate::Digest;
 
-pub fn write_index(index: &Index) -> Vec<u8> {
+pub(super) fn write_index(index: &Index) -> Vec<u8> {
     let mut siz = std::mem::size_of::<IndexHeader>();
     for entry in &index.entries {
         siz += std::mem::size_of::<IndexEntry>() + entry.name.to_bytes().len();

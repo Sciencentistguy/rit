@@ -3,7 +3,7 @@ mod write;
 
 use std::ffi::CStr;
 use std::os::unix::prelude::OsStrExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::digest::Digest;
 use crate::Result;
@@ -74,10 +74,23 @@ impl IndexEntry<'_> {
     }
 }
 
-pub struct Index<'a> {
+struct Index<'a> {
     header: IndexHeader,
     entries: Vec<IndexEntry<'a>>,
     oid: Digest,
+}
+
+pub struct IndexWrapper {
+    path: PathBuf,
+    // entries: Vec<IndexEntry>,
+}
+
+impl IndexWrapper {
+    pub fn open(path: &Path) -> Self {
+        Self {
+            path: path.join(".git/index"),
+        }
+    }
 }
 
 #[cfg(test)]

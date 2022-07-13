@@ -6,7 +6,7 @@ use super::{Index, IndexEntry, IndexHeader};
 use crate::util::align_to_n;
 use crate::Digest;
 
-pub fn parse_index(bytes: &[u8]) -> Index {
+pub(super) fn parse_index(bytes: &[u8]) -> Index {
     let header = parse_index_header(bytes[..12].try_into().unwrap());
     assert!(
         header.has_valid_magic(),

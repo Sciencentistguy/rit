@@ -17,24 +17,26 @@ use std::path::PathBuf;
 
 use tracing::*;
 
+use self::index::IndexWrapper;
+
 pub struct Repo {
     dir: PathBuf,
     head_path: PathBuf,
     database: Database,
-    // index: Index,
+    index: IndexWrapper,
 }
 
 impl Repo {
     pub fn new(repo_root: PathBuf) -> Self {
         let database = Database::new(&repo_root);
-        // let index = Index::new(&repo_root);
+        let index = IndexWrapper::open(&repo_root);
         trace!(path=?repo_root, "Opened repo");
         let head_path = repo_root.join(".git/HEAD");
         Self {
             dir: repo_root,
             head_path,
             database,
-            // index,
+            index,
         }
     }
 
