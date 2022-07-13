@@ -10,6 +10,10 @@ pub enum Command {
         #[clap(short, long, env = "RIT_COMMIT_MESSAGE")]
         message: Option<String>,
     },
+    Add {
+        #[clap(env = "RIT_ADD_PATH")]
+        path: PathBuf,
+    },
 }
 
 #[derive(Debug, Parser)]

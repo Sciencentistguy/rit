@@ -4,7 +4,7 @@ use tempdir::TempDir;
 #[test]
 fn rit_init() -> Result<()> {
     let dir = TempDir::new("")?;
-    let repo = Repo::new(dir.path().to_owned());
+    let mut repo = Repo::new(dir.path().to_owned());
     repo.init()?;
 
     let git_dir = dir.as_ref().join(".git");

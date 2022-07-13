@@ -17,10 +17,9 @@ pub struct Database {
 
 impl Database {
     pub fn new(root_path: impl AsRef<Path>) -> Self {
-        let mut database_root = root_path.as_ref().canonicalize().unwrap();
-        database_root.push(".git");
-        database_root.push("objects");
-        Self { database_root }
+        Self {
+            database_root: root_path.as_ref().join(".git/objects"),
+        }
     }
 
     pub fn store(&self, obj: &impl Storable) -> Result<()> {

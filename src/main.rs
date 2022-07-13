@@ -7,6 +7,7 @@ mod lock;
 mod repo;
 mod storable;
 mod util;
+mod filemode;
 
 pub use color_eyre::Result;
 
@@ -30,7 +31,7 @@ fn main() -> Result<()> {
 
     Lazy::force(&ARGS);
 
-    let repo = match ARGS.path {
+    let mut repo = match ARGS.path {
         Some(ref path) => Repo::new(path.clone()),
         None => Repo::new(std::env::current_dir()?),
     };
@@ -44,6 +45,9 @@ fn main() -> Result<()> {
                     .expect("Using an editor for commit message is currently unimplemented"),
             )?;
             println!("Created commit {}", commit_id.to_hex())
+        }
+        Command::Add { path } => {
+            repo.add(path)?;
         }
     }
     Ok(())
