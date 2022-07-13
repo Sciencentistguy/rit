@@ -1,5 +1,3 @@
-use std::ffi::CStr;
-
 use tracing::{trace, warn};
 
 use super::{Index, IndexEntry, IndexHeader};
