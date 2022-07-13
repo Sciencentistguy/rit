@@ -16,14 +16,15 @@ use std::path::PathBuf;
 
 use tracing::*;
 
-use self::index::IndexWrapper;
+use self::index::{IndexWrapper, IndexEntry};
 
 pub struct Repo {
-    dir: PathBuf,
-    head_path: PathBuf,
-    database: Database,
-    index: IndexWrapper,
+    pub dir: PathBuf,
+    pub head_path: PathBuf,
+    pub database: Database,
+    pub index: IndexWrapper,
 }
+
 
 impl Repo {
     pub fn open(repo_root: PathBuf) -> Self {

@@ -9,6 +9,7 @@ use tracing::trace;
 
 use crate::digest::Digest;
 use crate::filemode::FileMode;
+use crate::storable::tree::TreeEntry;
 use crate::Result;
 
 struct IndexHeader {
@@ -44,7 +45,7 @@ pub struct IndexEntry {
     name: Vec<u8>,
 }
 
-impl crate::storable::tree::TreeEntry for IndexEntry {
+impl TreeEntry for IndexEntry {
     fn digest(&self) -> &Digest {
         &self.oid
     }
@@ -162,19 +163,11 @@ impl IndexWrapper {
 
     pub fn add(&mut self, path: &Path, oid: &Digest, stat: libc::stat) {
         trace!(?path, "Adding entry to index");
-        let existing = self
-            .entries
-            .iter()
-            .position(|e| e.name == path.as_os_str().as_bytes());
-
-        if let Some(idx) = existing {
-            //FIXE: maybe preserve order rather than just sorting later
-            self.entries.swap_remove(idx);
-        }
-
         let entry = IndexEntry::create(path, oid, stat).unwrap();
-        //FIXE: maybe preserve order rather than just sorting later
+
+        self.discard_conflicts(&entry);
         self.entries.push(entry);
+
         self.entries.sort_unstable();
     }
 
@@ -187,6 +180,15 @@ impl IndexWrapper {
 
     pub fn entries(&self) -> &[IndexEntry] {
         &self.entries
+    }
+
+    pub(crate) fn discard_conflicts(&mut self, entry: &IndexEntry) {
+        for dir in entry.parents() {
+            let idx = self.entries.iter().position(|e| e.path() == dir);
+            if let Some(idx) = idx {
+                self.entries.swap_remove(idx);
+            }
+        }
     }
 }
 
