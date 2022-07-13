@@ -1,9 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    fs::Metadata,
-    os::unix::prelude::*,
-    path::{Path, PathBuf},
-};
+use std::{collections::BTreeMap, path::Path};
 
 use color_eyre::Result;
 use tracing::*;
@@ -11,32 +6,16 @@ use tracing::*;
 use super::Storable;
 use crate::{filemode::FileMode, repo::index::IndexEntry, util::Descends, Digest};
 
-#[derive(Clone)]
-pub struct Entry {
-    path: PathBuf,
-    oid: Digest,
-    mode: FileMode,
-}
+pub trait TreeEntry {
+    fn digest(&self) -> &Digest;
+    fn mode(&self) -> FileMode;
+    fn name(&self) -> &[u8];
+    fn path(&self) -> &Path;
 
-impl std::fmt::Debug for Entry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Entry").field("path", &self.path).finish()
-    }
-}
-
-impl Entry {
-    pub fn new(filename: PathBuf, oid: Digest, metadata: Metadata) -> Self {
-        let mode = if FileMode(metadata.mode()).is_executable() {
-            FileMode::EXECUTABLE
-        } else {
-            FileMode::REGULAR
-        };
-
-        Self {
-            path: filename,
-            oid,
-            mode,
-        }
+    fn parents(&self) -> Vec<&Path> {
+        let mut v = self.path().descends();
+        v.pop();
+        v
     }
 }
 
@@ -82,7 +61,7 @@ impl PartialTree {
             data.extend_from_slice(name.as_bytes());
             data.push(b'\0');
             let oid = match entry {
-                PartialTreeEntry::File(f) => &f.oid(),
+                PartialTreeEntry::File(f) => f.digest(),
                 PartialTreeEntry::Directory(d) => {
                     d.oid.as_ref().expect("subtree oid should have been inited")
                 }
