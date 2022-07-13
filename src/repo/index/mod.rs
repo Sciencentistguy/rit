@@ -142,14 +142,22 @@ impl IndexWrapper {
             entries.len()
         );
 
-        Self {
-            path,
-            entries,
-        }
+        Self { path, entries }
     }
 
     pub fn add(&mut self, path: &Path, oid: &Digest, stat: libc::stat) {
+        let existing = self
+            .entries
+            .iter()
+            .position(|e| e.name == path.as_os_str().as_bytes());
+
+        if let Some(idx) = existing {
+            //FIXE: maybe preserve order rather than just sorting later
+            self.entries.swap_remove(idx);
+        }
+
         let entry = IndexEntry::create(path, oid, stat).unwrap();
+        //FIXE: maybe preserve order rather than just sorting later
         self.entries.push(entry);
         self.entries.sort_unstable();
     }
