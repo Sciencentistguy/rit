@@ -40,7 +40,7 @@ impl Repo {
         }
     }
 
-    pub fn init(&self) -> Result<()> {
+    pub fn init(&mut self) -> Result<()> {
         trace!(path=?self.dir, "Initialising repo");
         let git_dir = self.dir.join(".git");
         if git_dir.exists() {
@@ -55,7 +55,7 @@ impl Repo {
         Ok(())
     }
 
-    pub fn commit(&self, message: &str) -> Result<Digest> {
+    pub fn commit(&mut self, message: &str) -> Result<Digest> {
         trace!(path=?self.dir, %message, "Starting commit");
         let entries = self.list_files()?;
         let mut root = PartialTree::build(entries)?;
@@ -80,18 +80,19 @@ impl Repo {
         Ok(commit.into_oid())
     }
 
-    pub fn add(&self, path: &Path) -> Result<()> {
+    pub fn add(&mut self, path: &Path) -> Result<()> {
         trace!(?path, "Adding file");
 
-        let data = std::fs::read(path)?;
-        let stat = Self::stat_file(path);
-        // let index = todo!();
+        let abs_path = self.dir.join(path);
 
-        // let blob = Blob::new(&data);
-        // self.database.store(&blob)?;
-        // index.add(path, blob.oid, stat);
-        // index.write_updates();
+        let data = std::fs::read(&abs_path)?;
+        let stat = Self::stat_file(&abs_path);
 
-        todo!()
+        let blob = Blob::new(&data);
+        self.database.store(&blob)?;
+        self.index.add(path, blob.get_oid(), stat);
+        self.index.write_out()?;
+
+        Ok(())
     }
 }

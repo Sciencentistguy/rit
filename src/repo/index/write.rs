@@ -1,13 +1,7 @@
-use tracing::warn;
-
 use super::{Index, IndexEntry, IndexHeader};
 use crate::Digest;
 
 pub(super) fn write_index(index: &Index) -> Vec<u8> {
-    let mut siz = std::mem::size_of::<IndexHeader>();
-    for entry in &index.entries {
-        siz += std::mem::size_of::<IndexEntry>() + entry.name.to_bytes().len();
-    }
     let mut out = Vec::new();
     write_index_header(&index.header, &mut out);
 
@@ -16,12 +10,15 @@ pub(super) fn write_index(index: &Index) -> Vec<u8> {
     }
 
     let oid = Digest::new(&out);
-    if oid != index.oid {
-        warn!(
-            "Writing index with differing oid: {:x} != {:x}",
-            oid, index.oid
-        );
-    }
+    // XXX: Should probably store + verify the oid at some point
+    /*
+     * if oid != index.oid {
+     *     warn!(
+     *         "Writing index with differing oid: {:x} != {:x}",
+     *         oid, index.oid
+     *     );
+     * }
+     */
 
     out.extend_from_slice(&oid.0);
 
@@ -65,7 +62,11 @@ fn write_index_entry(
     out.extend_from_slice(&siz.to_be_bytes());
     out.extend_from_slice(&oid.0);
     out.extend_from_slice(&flags.to_be_bytes());
-    out.extend_from_slice(name.to_bytes_with_nul());
+
+    // We don't store the null terminator in IndexEntry::name. Re-add it here
+    out.extend_from_slice(name);
+    out.push(b'\0');
+
     let len = out.len() - start_len;
     let extra = len % 8;
     if extra != 0 {

@@ -31,7 +31,7 @@ fn main() -> Result<()> {
 
     Lazy::force(&ARGS);
 
-    let repo = match ARGS.path {
+    let mut repo = match ARGS.path {
         Some(ref path) => Repo::new(path.clone()),
         None => Repo::new(std::env::current_dir()?),
     };
@@ -48,7 +48,6 @@ fn main() -> Result<()> {
         }
         Command::Add { path } => {
             repo.add(path)?;
-            todo!()
         }
     }
     Ok(())

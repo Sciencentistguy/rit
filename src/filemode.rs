@@ -1,4 +1,6 @@
-#[derive(Clone, Copy)]
+use std::ops::{Deref, DerefMut};
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct FileMode(pub u32);
 
@@ -15,5 +17,25 @@ impl FileMode {
 
     pub fn is_executable(self) -> bool {
         self.0 & libc::S_IXUSR != 0
+    }
+}
+
+impl From<u32> for FileMode {
+    fn from(mode: u32) -> Self {
+        Self(mode)
+    }
+}
+
+impl Deref for FileMode {
+    type Target = u32;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for FileMode {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

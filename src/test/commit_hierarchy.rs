@@ -31,7 +31,7 @@ pub(super) fn rit_commit_hierarchy() -> Result<()> {
         "commit.gpgsign=false",
     ];
 
-    let rit_repo = Repo::new(dir_rit.to_owned());
+    let mut rit_repo = Repo::new(dir_rit.to_owned());
 
     // Rit create files
     rit_repo.init()?;
