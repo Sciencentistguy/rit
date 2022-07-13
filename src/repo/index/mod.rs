@@ -136,16 +136,13 @@ impl IndexWrapper {
         })()
         .unwrap_or_else(|_| Vec::new());
 
-        trace!(
-            "Opened index at {:?} with {} entries",
-            path.canonicalize(),
-            entries.len()
-        );
+        trace!(?path, "Opened index with {} entries", entries.len());
 
         Self { path, entries }
     }
 
     pub fn add(&mut self, path: &Path, oid: &Digest, stat: libc::stat) {
+        trace!(?path, "Adding entry to index");
         let existing = self
             .entries
             .iter()

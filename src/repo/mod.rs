@@ -27,10 +27,10 @@ pub struct Repo {
 }
 
 impl Repo {
-    pub fn new(repo_root: PathBuf) -> Self {
+    pub fn open(repo_root: PathBuf) -> Self {
+        trace!(path=?repo_root, "Opening repo");
         let database = Database::new(&repo_root);
         let index = IndexWrapper::open(&repo_root);
-        trace!(path=?repo_root, "Opened repo");
         let head_path = repo_root.join(".git/HEAD");
         Self {
             dir: repo_root,
