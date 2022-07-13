@@ -1,4 +1,5 @@
 use crate::repo::*;
+use crate::test::{COMMIT_EMAIL, COMMIT_NAME};
 use crate::*;
 use std::fs::Permissions;
 use std::io::{self, Write};
@@ -10,11 +11,12 @@ use tempdir::TempDir;
 #[test]
 fn commit() -> Result<()> {
     fn write_test_files(path: &Path) -> io::Result<()> {
-        writeln!(std::fs::File::create(path.join("file1"))?, "hello")?;
-        writeln!(std::fs::File::create(path.join("file2"))?, "world")?;
-        writeln!(std::fs::File::create(path.join("file3"))?, "world")?;
+        // Test files:
+        // - file1: a normal file, chmod 644 (should be stored as REGULAR)
+        // - file2: a normal file, chmod 755 (should be stored as EXECUTABLE)
+        // - file3: a normal file, chmod 655 (should be stored as REGULAR (644))
+        crate::testfiles!(path, ["file1", "file2", "file3"]);
         std::fs::set_permissions(path.join("file2"), Permissions::from_mode(0o100755))?;
-        // Git should store this as 0o644
         std::fs::set_permissions(path.join("file3"), Permissions::from_mode(0o100655))?;
         Ok(())
     }
@@ -22,9 +24,6 @@ fn commit() -> Result<()> {
     let dir_rit = dir_rit.path();
     let dir_git = TempDir::new("")?;
     let dir_git = dir_git.path();
-
-    const COMMIT_NAME: &str = "Jamie Quigley";
-    const COMMIT_EMAIL: &str = "jamie@quigley.xyz";
 
     std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
     std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
@@ -40,9 +39,7 @@ fn commit() -> Result<()> {
 
     let mut rit_repo = Repo::open(dir_rit.to_owned());
 
-    // Rit create files
     rit_repo.init()?;
-    // create test files
     write_test_files(dir_rit)?;
     rit_repo.add(&[".".into()])?;
     let commit_id = rit_repo.commit("test")?;
@@ -74,8 +71,8 @@ fn commit() -> Result<()> {
         .status()?;
 
     let rit_dir = dir_rit.join(".git");
-    let file1_path = Path::new("objects/cc/628ccd10742baea8241c5924df992b5c019f71");
-    let tree_path = Path::new("objects/f1/301392513b517dd97c2d06d022e17f9bdfa6a3");
+    let file1_path = Path::new("objects/86/f8ad067d20fa9b45f673d8e39f0bd9696664cb");
+    let tree_path = Path::new("objects/b1/241e4ad46f3749d7c7962c122c5343dc2b90e4");
     assert!(rit_dir.join(file1_path).exists());
 
     let git_dir = dir_git.join(".git");
@@ -101,7 +98,7 @@ fn commit() -> Result<()> {
 
     if let [tree, _, _, _, msg] = generated_commit.lines().collect::<Vec<_>>()[..] {
         assert_eq!(
-            tree, "tree f1301392513b517dd97c2d06d022e17f9bdfa6a3",
+            tree, "tree b1241e4ad46f3749d7c7962c122c5343dc2b90e4",
             "Tree OID in commit did not match"
         );
         assert_eq!(msg, "test", "Commit message did not match");

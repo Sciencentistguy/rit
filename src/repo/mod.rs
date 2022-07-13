@@ -16,7 +16,7 @@ use std::path::PathBuf;
 
 use tracing::*;
 
-use self::index::{IndexWrapper, IndexEntry};
+use self::index::{IndexEntry, IndexWrapper};
 
 pub struct Repo {
     pub dir: PathBuf,
@@ -24,7 +24,6 @@ pub struct Repo {
     pub database: Database,
     pub index: IndexWrapper,
 }
-
 
 impl Repo {
     pub fn open(repo_root: PathBuf) -> Self {
@@ -84,6 +83,12 @@ impl Repo {
         for path in paths {
             let paths = self.list_files(path)?;
             for path in paths {
+                let path = if path.has_root() {
+                    path.strip_prefix(&self.dir)?
+                } else {
+                    &path
+                };
+                // let path = path.strip_prefix(&self.dir)?;
                 trace!(?path, "Adding file");
                 let abs_path = self.dir.join(&path);
 

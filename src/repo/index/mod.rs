@@ -140,6 +140,7 @@ impl Index {
     }
 }
 
+#[derive(Debug)]
 pub struct IndexWrapper {
     path: PathBuf,
     //FIXME: this could be a Cow
@@ -189,17 +190,42 @@ impl IndexWrapper {
                 self.entries.swap_remove(idx);
             }
         }
+        // let mut to_remove = Vec::new();
+        // for e in &self.entries {
+            // let osstr = OsStr::from_bytes(&e.name);
+            // let idx = e.parents().into_iter().position(|e| e == Path::new(osstr));
+            // if let Some(idx) = idx {
+                // to_remove.push(idx);
+            // }
+        // }
+        // for idx in to_remove {
+            // self.entries.swap_remove(idx);
+        // }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs::Permissions;
+    use std::os::unix::prelude::PermissionsExt;
+    use std::process::{Command, Stdio};
+
+    use tempdir::TempDir;
+
     use super::{parse::*, write::*};
+    use crate::repo::Repo;
+    use crate::Result;
 
     #[test]
     #[ignore = "Doesn't work in CI"]
+    /// Parse an index from the filesystem and write it back out. The generated file should be
+    /// identical (modulo extensions, and therefore also the oid).
+    ///
+    /// Note that this is disabled by default, as it relys on an existing, large repository (the
+    /// provided path is a nixpkgs checkout).
     fn read_write_index() {
-        let bytes = std::fs::read("/home/jamie/Git/nixpkgs-official/.git/index").unwrap();
+        const TEST_GIT_REPO_PATH: &str = "/home/jamie/Git/nixpkgs-official/.git/index";
+        let bytes = std::fs::read(TEST_GIT_REPO_PATH).unwrap();
         let idx = parse_index(&bytes);
 
         for e in &idx.entries {
@@ -215,5 +241,55 @@ mod tests {
         } else {
             assert_eq!(bytes, new_bytes);
         }
+    }
+
+    #[test]
+    /// Place files in the directory. Using rit, init the directory as a repo, and add the files.
+    /// Read the genreated `.git/index` into a Vec.
+    ///
+    /// Then, delete `.git`, and perform the same operations (on the same files) using git.
+    /// Read the generated `.git/index` into a Vec.
+    ///
+    /// These should be indentical
+    fn generate_and_read_index() -> Result<()> {
+        let dir = TempDir::new("")?;
+        let dir = dir.path();
+
+        let mut rit_repo = Repo::open(dir.to_owned());
+
+        // Test files:
+        // - file1: a normal file, chmod 644 (should be stored as REGULAR)
+        // - file2: a normal file, chmod 755 (should be stored as EXECUTABLE)
+        // - file3: a normal file, chmod 655 (should be stored as REGULAR (644))
+        // - a/b/c.txt: a file in a directory
+        crate::testfiles!(dir, ["file1", "file2", "file3", "a/b/c.txt"]);
+        std::fs::set_permissions(dir.join("file2"), Permissions::from_mode(0o100755))?;
+        std::fs::set_permissions(dir.join("file3"), Permissions::from_mode(0o100655))?;
+
+        rit_repo.init()?;
+        rit_repo.add(&[".".into()])?;
+        let rit_index = std::fs::read(dir.join(".git/index"))?;
+
+        std::fs::remove_dir_all(dir.join(".git"))?;
+
+        Command::new("git")
+            .arg("init")
+            .current_dir(&dir)
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+
+        Command::new("git")
+            .arg("add")
+            .arg("--all")
+            .current_dir(&dir)
+            .stdout(Stdio::null())
+            .status()?;
+
+        let git_index = std::fs::read(dir.join(".git/index"))?;
+
+        assert_eq!(rit_index, git_index);
+
+        Ok(())
     }
 }
