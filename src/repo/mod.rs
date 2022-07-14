@@ -3,6 +3,7 @@ pub mod index;
 mod refs;
 mod workspace;
 
+use color_eyre::eyre::Context;
 use database::Database;
 // use index::Index;
 
@@ -16,7 +17,7 @@ use std::path::PathBuf;
 
 use tracing::*;
 
-use self::index::{IndexEntry, IndexWrapper};
+use self::index::IndexWrapper;
 
 pub struct Repo {
     pub dir: PathBuf,
@@ -84,7 +85,8 @@ impl Repo {
             let paths = self.list_files(path)?;
             for path in paths {
                 let path = if path.has_root() {
-                    path.strip_prefix(&self.dir)?
+                    path.strip_prefix(&self.dir)
+                        .wrap_err(format!("Path: {:?}", path))?
                 } else {
                     &path
                 };
@@ -97,7 +99,7 @@ impl Repo {
 
                 let blob = Blob::new(&data);
                 self.database.store(&blob)?;
-                self.index.add(&path, blob.get_oid(), stat);
+                self.index.add(path, blob.get_oid(), stat);
             }
         }
         self.index.write_out()?;

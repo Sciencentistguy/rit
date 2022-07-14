@@ -3,6 +3,7 @@ use std::mem::MaybeUninit;
 use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
 
+use color_eyre::eyre::Context;
 use walkdir::WalkDir;
 
 use crate::*;

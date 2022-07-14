@@ -39,6 +39,8 @@ mod tests {
     use super::*;
 
     #[test]
+    /// Generate a blob with known contents. Ensure that the OID and the formatted output are as
+    /// expected.
     fn test_blob_format() {
         let text = "hello\n";
         let expected_hash = [

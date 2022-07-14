@@ -2,13 +2,18 @@ use crate::repo::*;
 use crate::test::{COMMIT_EMAIL, COMMIT_NAME};
 use crate::*;
 use std::fs::Permissions;
-use std::io::{self, Write};
+use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use tempdir::TempDir;
 
 #[test]
+/// Create two temporary directories. Create the same set of files in both. In one, use rit to
+/// init a repo, add the files, and commit them. In the other, use Git.
+///
+/// The generated Trees and Blobs should be identical. The commit itself will not be identical due
+/// to differing timestamps, but the *text* of the commit should be.
 fn commit() -> Result<()> {
     fn write_test_files(path: &Path) -> io::Result<()> {
         // Test files:

@@ -52,6 +52,7 @@ mod tests {
     use super::*;
 
     #[test]
+    /// Test that align_to works as expected for n=8 (the only one used at the time of writing)
     fn test_align_to_8() {
         for i in 1..9 {
             assert_eq!(align_to(8, i), 8);

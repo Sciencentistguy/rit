@@ -1,11 +1,15 @@
 use crate::test::{COMMIT_EMAIL, COMMIT_NAME};
 use crate::*;
-use std::io::{self, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use tempdir::TempDir;
 
 #[test]
+/// Create two temporary directories. Create "a/b/c.txt" in both. In one, use rit to
+/// init a repo, add the file, and commit it. In the other, use Git.
+///
+/// The generated Trees and Blob should be identical. The commit itself will not be identical due
+/// to differing timestamps, but the *text* of the commit should be.
 pub(super) fn rit_commit_hierarchy() -> Result<()> {
     let dir_rit = TempDir::new("")?;
     let dir_rit = dir_rit.path();
