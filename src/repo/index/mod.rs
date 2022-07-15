@@ -1,6 +1,7 @@
 mod parse;
 mod write;
 
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -183,24 +184,33 @@ impl IndexWrapper {
         &self.entries
     }
 
-    pub(crate) fn discard_conflicts(&mut self, entry: &IndexEntry) {
+    /// Discard all entries that conflict with the given entry.
+    /// e.g. if a file is added at `foo/bar` then `/foo/bar/baz` will be removed.
+    ///
+    /// Note: Does not preserve order
+    fn discard_conflicts(&mut self, entry: &IndexEntry) {
+        let mut to_remove = HashSet::new();
+
         for dir in entry.parents() {
             let idx = self.entries.iter().position(|e| e.path() == dir);
             if let Some(idx) = idx {
-                self.entries.swap_remove(idx);
+                to_remove.insert(idx);
             }
         }
-        // let mut to_remove = Vec::new();
-        // for e in &self.entries {
-            // let osstr = OsStr::from_bytes(&e.name);
-            // let idx = e.parents().into_iter().position(|e| e == Path::new(osstr));
-            // if let Some(idx) = idx {
-                // to_remove.push(idx);
-            // }
-        // }
-        // for idx in to_remove {
-            // self.entries.swap_remove(idx);
-        // }
+
+        'outer: for (i, old_entry) in self.entries().iter().enumerate() {
+            for path in old_entry.parents() {
+                if path == entry.path() {
+                    to_remove.insert(i);
+                    continue 'outer;
+                }
+            }
+        }
+
+        for idx in to_remove {
+            trace!(entry = ?self.entries[idx].path(), "Removing entry due to conflict");
+            self.entries.swap_remove(idx);
+        }
     }
 }
 
@@ -262,7 +272,7 @@ mod tests {
         // - file2: a normal file, chmod 755 (should be stored as EXECUTABLE)
         // - file3: a normal file, chmod 655 (should be stored as REGULAR (644))
         // - a/b/c.txt: a file in a directory
-        crate::testfiles!(dir, ["file1", "file2", "file3", "a/b/c.txt"]);
+        crate::create_test_files!(dir, ["file1", "file2", "file3", "a/b/c.txt"]);
         std::fs::set_permissions(dir.join("file2"), Permissions::from_mode(0o100755))?;
         std::fs::set_permissions(dir.join("file3"), Permissions::from_mode(0o100655))?;
 

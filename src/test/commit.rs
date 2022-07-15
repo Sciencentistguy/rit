@@ -20,7 +20,7 @@ fn commit() -> Result<()> {
         // - file1: a normal file, chmod 644 (should be stored as REGULAR)
         // - file2: a normal file, chmod 755 (should be stored as EXECUTABLE)
         // - file3: a normal file, chmod 655 (should be stored as REGULAR (644))
-        crate::testfiles!(path, ["file1", "file2", "file3"]);
+        crate::create_test_files!(path, ["file1", "file2", "file3"]);
         std::fs::set_permissions(path.join("file2"), Permissions::from_mode(0o100755))?;
         std::fs::set_permissions(path.join("file3"), Permissions::from_mode(0o100655))?;
         Ok(())

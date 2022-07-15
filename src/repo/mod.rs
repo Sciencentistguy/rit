@@ -90,7 +90,6 @@ impl Repo {
                 } else {
                     &path
                 };
-                // let path = path.strip_prefix(&self.dir)?;
                 trace!(?path, "Adding file");
                 let abs_path = self.dir.join(&path);
 

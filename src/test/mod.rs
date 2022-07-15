@@ -7,7 +7,7 @@ pub const COMMIT_NAME: &str = "Jamie Quigley";
 pub const COMMIT_EMAIL: &str = "jamie@quigley.xyz";
 
 #[macro_export]
-macro_rules! testfiles {
+macro_rules! create_test_files {
     ($root:ident, [$($path:expr),*]) => {{
         use std::io::Write;
         $({

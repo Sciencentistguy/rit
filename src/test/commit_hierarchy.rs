@@ -34,7 +34,7 @@ pub(super) fn rit_commit_hierarchy() -> Result<()> {
 
     // Test files:
     // - a/b/c.txt: a file in a directory
-    crate::testfiles!(dir_rit, ["a/b/c.txt"]);
+    crate::create_test_files!(dir_rit, ["a/b/c.txt"]);
     rit_repo.add(&[".".into()])?;
     let commit_id = rit_repo.commit("test")?;
 
@@ -46,7 +46,7 @@ pub(super) fn rit_commit_hierarchy() -> Result<()> {
         .status()
         .unwrap();
 
-    crate::testfiles!(dir_git, ["a/b/c.txt"]);
+    crate::create_test_files!(dir_git, ["a/b/c.txt"]);
 
     Command::new("git")
         .args(&git_command_args)
