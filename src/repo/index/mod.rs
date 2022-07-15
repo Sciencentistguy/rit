@@ -149,18 +149,18 @@ pub struct IndexWrapper {
 }
 
 impl IndexWrapper {
-    pub fn open(path: &Path) -> Self {
-        let path = path.join(".git/index");
+    pub fn open(git_folder: &Path) -> Self {
+        let index_path = git_folder.join("index");
         let entries = (|| -> Result<Vec<IndexEntry>> {
-            let current_index = std::fs::read(&path)?;
+            let current_index = std::fs::read(&index_path)?;
             let current_index = parse::parse_index(&current_index);
             Ok(current_index.entries)
         })()
         .unwrap_or_else(|_| Vec::new());
 
-        trace!(?path, "Opened index with {} entries", entries.len());
+        trace!(?index_path, "Opened index with {} entries", entries.len());
 
-        Self { path, entries }
+        Self { path: index_path, entries }
     }
 
     pub fn add(&mut self, path: &Path, oid: &Digest, stat: libc::stat) {
@@ -265,7 +265,6 @@ mod tests {
         let dir = TempDir::new("")?;
         let dir = dir.path();
 
-        let mut rit_repo = Repo::open(dir.to_owned());
 
         // Test files:
         // - file1: a normal file, chmod 644 (should be stored as REGULAR)
@@ -276,7 +275,8 @@ mod tests {
         std::fs::set_permissions(dir.join("file2"), Permissions::from_mode(0o100755))?;
         std::fs::set_permissions(dir.join("file3"), Permissions::from_mode(0o100655))?;
 
-        rit_repo.init()?;
+        Repo::init(dir)?;
+        let mut rit_repo = Repo::open(dir.to_owned())?;
         rit_repo.add(&[".".into()])?;
         let rit_index = std::fs::read(dir.join(".git/index"))?;
 

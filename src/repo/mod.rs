@@ -3,6 +3,7 @@ pub mod index;
 mod refs;
 mod workspace;
 
+use color_eyre::eyre::eyre;
 use color_eyre::eyre::Context;
 use database::Database;
 // use index::Index;
@@ -13,6 +14,7 @@ use crate::{
     Result,
 };
 
+use std::path::Path;
 use std::path::PathBuf;
 
 use tracing::*;
@@ -27,22 +29,30 @@ pub struct Repo {
 }
 
 impl Repo {
-    pub fn open(repo_root: PathBuf) -> Self {
+    pub fn open(repo_root: PathBuf) -> Result<Self> {
+        let git_dir = repo_root.join(".git");
+        if !git_dir.exists() {
+            return Err(eyre!(
+                "Failed to open repository: directory is not a git repository: '{}'",
+                repo_root.display()
+            ));
+        }
+
         trace!(path=?repo_root, "Opening repo");
-        let database = Database::new(&repo_root);
-        let index = IndexWrapper::open(&repo_root);
-        let head_path = repo_root.join(".git/HEAD");
-        Self {
+        let database = Database::new(&git_dir);
+        let index = IndexWrapper::open(&git_dir);
+        let head_path = git_dir.join("HEAD");
+        Ok(Self {
             dir: repo_root,
             head_path,
             database,
             index,
-        }
+        })
     }
 
-    pub fn init(&mut self) -> Result<()> {
-        trace!(path=?self.dir, "Initialising repo");
-        let git_dir = self.dir.join(".git");
+    pub fn init(path: &Path) -> Result<()> {
+        trace!(?path, "Initialising repo");
+        let git_dir = path.join(".git");
         if git_dir.exists() {
             warn!("Repo already exists, init will do nothing");
         } else {
@@ -82,6 +92,10 @@ impl Repo {
 
     pub fn add(&mut self, paths: &[PathBuf]) -> Result<()> {
         for path in paths {
+            trace!(?path, "Adding file to repo");
+            if !self.dir.join(path).exists() {
+                return Err(eyre!("Path does not exist: {}", path.display()));
+            }
             let paths = self.list_files(path)?;
             for path in paths {
                 let path = if path.has_root() {
@@ -93,7 +107,7 @@ impl Repo {
                 trace!(?path, "Adding file");
                 let abs_path = self.dir.join(&path);
 
-                let data = std::fs::read(&abs_path)?;
+                let data = std::fs::read(&abs_path).wrap_err(format!("Failed to read file: {}", abs_path.display()))?;
                 let stat = Self::stat_file(&abs_path);
 
                 let blob = Blob::new(&data);

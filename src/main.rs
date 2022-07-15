@@ -9,6 +9,7 @@ mod repo;
 mod storable;
 mod util;
 
+use color_eyre::eyre::Context;
 pub use color_eyre::Result;
 
 use crate::digest::Digest;
@@ -31,13 +32,22 @@ fn main() -> Result<()> {
 
     Lazy::force(&ARGS);
 
-    let mut repo = match ARGS.path {
-        Some(ref path) => Repo::open(path.canonicalize()?),
-        None => Repo::open(std::env::current_dir()?.canonicalize()?),
+    let path = match ARGS.path {
+        Some(ref path) => path
+            .canonicalize()
+            .wrap_err(format!("Directory not found: '{}'", path.display()))?,
+        None => std::env::current_dir()?.canonicalize()?,
     };
 
+    if matches!(ARGS.command, Command::Init) {
+        Repo::init(&path)?;
+        return Ok(());
+    }
+
+    let mut repo = Repo::open(path)?;
+
     match &ARGS.command {
-        Command::Init => repo.init()?,
+        Command::Init => unreachable!(),
         Command::Commit { message } => {
             let commit_id = repo.commit(
                 message

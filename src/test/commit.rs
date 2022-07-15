@@ -42,9 +42,9 @@ fn commit() -> Result<()> {
         "commit.gpgsign=false",
     ];
 
-    let mut rit_repo = Repo::open(dir_rit.to_owned());
 
-    rit_repo.init()?;
+    Repo::init(dir_rit)?;
+    let mut rit_repo = Repo::open(dir_rit.to_owned())?;
     write_test_files(dir_rit)?;
     rit_repo.add(&[".".into()])?;
     let commit_id = rit_repo.commit("test")?;

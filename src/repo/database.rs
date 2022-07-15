@@ -16,9 +16,9 @@ pub struct Database {
 }
 
 impl Database {
-    pub fn new(root_path: impl AsRef<Path>) -> Self {
+    pub fn new(git_folder: impl AsRef<Path>) -> Self {
         Self {
-            database_root: root_path.as_ref().join(".git/objects"),
+            database_root: git_folder.as_ref().join("objects"),
         }
     }
 

@@ -13,9 +13,9 @@ use crate::Result;
 fn test_dir_replaces_file() -> Result<()> {
     let root = TempDir::new("").unwrap();
     let root = root.path();
-    let mut repo = Repo::open(root.to_owned());
 
-    repo.init()?;
+    Repo::init(root)?;
+    let mut repo = Repo::open(root.to_owned())?;
 
     crate::create_test_files!(root, ["file1", "file2"]);
     repo.add(&["file1".into(), "file2".into()])?;
@@ -47,9 +47,10 @@ fn test_dir_replaces_file() -> Result<()> {
 fn test_file_replaces_dir() -> Result<()> {
     let root = TempDir::new("").unwrap();
     let root = root.path();
-    let mut repo = Repo::open(root.to_owned());
 
-    repo.init()?;
+    Repo::init(root)?;
+    let mut repo = Repo::open(root.to_owned())?;
+
     crate::create_test_files!(root, ["file1/file2/file3", "file1/file2/file4", "file5"]);
     repo.add(&[
         "file1/file2/file3".into(),

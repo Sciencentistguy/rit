@@ -28,9 +28,9 @@ pub(super) fn rit_commit_hierarchy() -> Result<()> {
         "commit.gpgsign=false",
     ];
 
-    let mut rit_repo = Repo::open(dir_rit.to_owned());
 
-    rit_repo.init()?;
+    Repo::init(dir_rit)?;
+    let mut rit_repo = Repo::open(dir_rit.to_owned())?;
 
     // Test files:
     // - a/b/c.txt: a file in a directory
