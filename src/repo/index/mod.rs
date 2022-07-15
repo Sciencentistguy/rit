@@ -1,6 +1,8 @@
 mod parse;
 mod write;
 
+use std::collections::HashSet;
+use std::ffi::OsStr;
 use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
 
@@ -8,6 +10,7 @@ use tracing::trace;
 
 use crate::digest::Digest;
 use crate::filemode::FileMode;
+use crate::storable::tree::TreeEntry;
 use crate::Result;
 
 struct IndexHeader {
@@ -22,8 +25,8 @@ impl IndexHeader {
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
-struct IndexEntry {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct IndexEntry {
     ctime_s: u32,
     ctime_n: u32,
 
@@ -41,6 +44,24 @@ struct IndexEntry {
     oid: Digest,
     flags: u16,
     name: Vec<u8>,
+}
+
+impl TreeEntry for IndexEntry {
+    fn digest(&self) -> &Digest {
+        &self.oid
+    }
+
+    fn mode(&self) -> FileMode {
+        self.mode
+    }
+
+    fn name(&self) -> &[u8] {
+        self.name.as_ref()
+    }
+
+    fn path(&self) -> &Path {
+        Path::new(OsStr::from_bytes(self.name.as_ref()))
+    }
 }
 
 impl Ord for IndexEntry {
@@ -120,6 +141,7 @@ impl Index {
     }
 }
 
+#[derive(Debug)]
 pub struct IndexWrapper {
     path: PathBuf,
     //FIXME: this could be a Cow
@@ -143,19 +165,11 @@ impl IndexWrapper {
 
     pub fn add(&mut self, path: &Path, oid: &Digest, stat: libc::stat) {
         trace!(?path, "Adding entry to index");
-        let existing = self
-            .entries
-            .iter()
-            .position(|e| e.name == path.as_os_str().as_bytes());
-
-        if let Some(idx) = existing {
-            //FIXE: maybe preserve order rather than just sorting later
-            self.entries.swap_remove(idx);
-        }
-
         let entry = IndexEntry::create(path, oid, stat).unwrap();
-        //FIXE: maybe preserve order rather than just sorting later
+
+        self.discard_conflicts(&entry);
         self.entries.push(entry);
+
         self.entries.sort_unstable();
     }
 
@@ -165,16 +179,63 @@ impl IndexWrapper {
         std::fs::write(&self.path, index)?;
         Ok(())
     }
+
+    pub fn entries(&self) -> &[IndexEntry] {
+        &self.entries
+    }
+
+    /// Discard all entries that conflict with the given entry.
+    /// e.g. if a file is added at `foo/bar` then `/foo/bar/baz` will be removed.
+    ///
+    /// Note: Does not preserve order
+    fn discard_conflicts(&mut self, entry: &IndexEntry) {
+        let mut to_remove = HashSet::new();
+
+        for dir in entry.parents() {
+            let idx = self.entries.iter().position(|e| e.path() == dir);
+            if let Some(idx) = idx {
+                to_remove.insert(idx);
+            }
+        }
+
+        'outer: for (i, old_entry) in self.entries().iter().enumerate() {
+            for path in old_entry.parents() {
+                if path == entry.path() {
+                    to_remove.insert(i);
+                    continue 'outer;
+                }
+            }
+        }
+
+        for idx in to_remove {
+            trace!(entry = ?self.entries[idx].path(), "Removing entry due to conflict");
+            self.entries.swap_remove(idx);
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs::Permissions;
+    use std::os::unix::prelude::PermissionsExt;
+    use std::process::{Command, Stdio};
+
+    use tempdir::TempDir;
+
     use super::{parse::*, write::*};
+    use crate::repo::Repo;
+    use crate::Result;
 
     #[test]
     #[ignore = "Doesn't work in CI"]
+    /// Parse an index from the filesystem and write it back out. The generated file should be
+    /// identical (modulo extensions, and therefore also the oid).
+    ///
+    /// Note that this is disabled by default, as it relys on an existing, large repository (the
+    /// provided path is a nixpkgs checkout).
     fn read_write_index() {
-        let bytes = std::fs::read("/home/jamie/Git/nixpkgs-official/.git/index").unwrap();
+        const TEST_GIT_REPO_PATH: &str = "/home/jamie/Git/nixpkgs-official/.git/index";
+        let bytes = std::fs::read(TEST_GIT_REPO_PATH).unwrap();
         let idx = parse_index(&bytes);
 
         for e in &idx.entries {
@@ -190,5 +251,55 @@ mod tests {
         } else {
             assert_eq!(bytes, new_bytes);
         }
+    }
+
+    #[test]
+    /// Place files in the directory. Using rit, init the directory as a repo, and add the files.
+    /// Read the genreated `.git/index` into a Vec.
+    ///
+    /// Then, delete `.git`, and perform the same operations (on the same files) using git.
+    /// Read the generated `.git/index` into a Vec.
+    ///
+    /// These should be indentical
+    fn generate_and_read_index() -> Result<()> {
+        let dir = TempDir::new("")?;
+        let dir = dir.path();
+
+        let mut rit_repo = Repo::open(dir.to_owned());
+
+        // Test files:
+        // - file1: a normal file, chmod 644 (should be stored as REGULAR)
+        // - file2: a normal file, chmod 755 (should be stored as EXECUTABLE)
+        // - file3: a normal file, chmod 655 (should be stored as REGULAR (644))
+        // - a/b/c.txt: a file in a directory
+        crate::create_test_files!(dir, ["file1", "file2", "file3", "a/b/c.txt"]);
+        std::fs::set_permissions(dir.join("file2"), Permissions::from_mode(0o100755))?;
+        std::fs::set_permissions(dir.join("file3"), Permissions::from_mode(0o100655))?;
+
+        rit_repo.init()?;
+        rit_repo.add(&[".".into()])?;
+        let rit_index = std::fs::read(dir.join(".git/index"))?;
+
+        std::fs::remove_dir_all(dir.join(".git"))?;
+
+        Command::new("git")
+            .arg("init")
+            .current_dir(&dir)
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+
+        Command::new("git")
+            .arg("add")
+            .arg("--all")
+            .current_dir(&dir)
+            .stdout(Stdio::null())
+            .status()?;
+
+        let git_index = std::fs::read(dir.join(".git/index"))?;
+
+        assert_eq!(rit_index, git_index);
+
+        Ok(())
     }
 }

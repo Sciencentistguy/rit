@@ -1,8 +1,9 @@
 mod database;
-mod index;
+pub mod index;
 mod refs;
 mod workspace;
 
+use color_eyre::eyre::Context;
 use database::Database;
 // use index::Index;
 
@@ -19,10 +20,10 @@ use tracing::*;
 use self::index::IndexWrapper;
 
 pub struct Repo {
-    dir: PathBuf,
-    head_path: PathBuf,
-    database: Database,
-    index: IndexWrapper,
+    pub dir: PathBuf,
+    pub head_path: PathBuf,
+    pub database: Database,
+    pub index: IndexWrapper,
 }
 
 impl Repo {
@@ -56,7 +57,7 @@ impl Repo {
 
     pub fn commit(&mut self, message: &str) -> Result<Digest> {
         trace!(path=?self.dir, %message, "Starting commit");
-        let entries = self.create_entries()?;
+        let entries = &self.index.entries();
         let mut root = PartialTree::build(entries)?;
         trace!("Traversing root");
         root.traverse(|tree| self.database.store(&tree.freeze()))?;
@@ -83,6 +84,12 @@ impl Repo {
         for path in paths {
             let paths = self.list_files(path)?;
             for path in paths {
+                let path = if path.has_root() {
+                    path.strip_prefix(&self.dir)
+                        .wrap_err(format!("Path: {:?}", path))?
+                } else {
+                    &path
+                };
                 trace!(?path, "Adding file");
                 let abs_path = self.dir.join(&path);
 
@@ -91,7 +98,7 @@ impl Repo {
 
                 let blob = Blob::new(&data);
                 self.database.store(&blob)?;
-                self.index.add(&path, blob.get_oid(), stat);
+                self.index.add(path, blob.get_oid(), stat);
             }
         }
         self.index.write_out()?;

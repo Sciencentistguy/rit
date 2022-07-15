@@ -1,23 +1,20 @@
+use crate::test::{COMMIT_EMAIL, COMMIT_NAME};
 use crate::*;
-use std::io::{self, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use tempdir::TempDir;
 
 #[test]
+/// Create two temporary directories. Create "a/b/c.txt" in both. In one, use rit to
+/// init a repo, add the file, and commit it. In the other, use Git.
+///
+/// The generated Trees and Blob should be identical. The commit itself will not be identical due
+/// to differing timestamps, but the *text* of the commit should be.
 pub(super) fn rit_commit_hierarchy() -> Result<()> {
-    fn write_test_files(path: &Path) -> io::Result<()> {
-        std::fs::create_dir_all(path.join("a/b"))?;
-        writeln!(std::fs::File::create(path.join("a/b/c.txt"))?, "file")?;
-        Ok(())
-    }
     let dir_rit = TempDir::new("")?;
     let dir_rit = dir_rit.path();
     let dir_git = TempDir::new("")?;
     let dir_git = dir_git.path();
-
-    const COMMIT_NAME: &str = "Jamie Quigley";
-    const COMMIT_EMAIL: &str = "jamie@quigley.xyz";
 
     std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
     std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
@@ -33,10 +30,12 @@ pub(super) fn rit_commit_hierarchy() -> Result<()> {
 
     let mut rit_repo = Repo::open(dir_rit.to_owned());
 
-    // Rit create files
     rit_repo.init()?;
-    // create test files
-    write_test_files(dir_rit)?;
+
+    // Test files:
+    // - a/b/c.txt: a file in a directory
+    crate::create_test_files!(dir_rit, ["a/b/c.txt"]);
+    rit_repo.add(&[".".into()])?;
     let commit_id = rit_repo.commit("test")?;
 
     Command::new("git")
@@ -47,7 +46,7 @@ pub(super) fn rit_commit_hierarchy() -> Result<()> {
         .status()
         .unwrap();
 
-    write_test_files(dir_git)?;
+    crate::create_test_files!(dir_git, ["a/b/c.txt"]);
 
     Command::new("git")
         .args(&git_command_args)
@@ -66,10 +65,10 @@ pub(super) fn rit_commit_hierarchy() -> Result<()> {
         .status()?;
 
     let rit_dir = dir_rit.join(".git");
-    let root_tree_path = Path::new("objects/43/f40e5accf591f2187d45ed0b2458d687a13554");
-    let a_tree_path = Path::new("objects/d8/ee74535df69d1cb6f4fc16a5a36d0f71ea948f");
-    let b_tree_path = Path::new("objects/ba/1c8f19d3c39b63be0a4af9e3c903c5417573a5");
-    let c_path = Path::new("objects/f7/3f3093ff865c514c6c51f867e35f693487d0d3");
+    let root_tree_path = Path::new("objects/86/fd91b1c8d427d3577466833d9d686e85cd48df");
+    let a_tree_path = Path::new("objects/4b/fb9c1f612da47abcfd8dfaff81dd7466b8f51e");
+    let b_tree_path = Path::new("objects/c3/b2f03652d76b13a2ddb3a5da088ce7b203b3c8");
+    let c_path = Path::new("objects/bf/c88425b0e2f167af3f1cfa9db193edf752b13b");
     assert!(rit_dir.join(root_tree_path).exists());
     assert!(rit_dir.join(a_tree_path).exists());
     assert!(rit_dir.join(b_tree_path).exists());
@@ -98,7 +97,7 @@ pub(super) fn rit_commit_hierarchy() -> Result<()> {
 
     if let [tree, _, _, _, msg] = generated_commit.lines().collect::<Vec<_>>()[..] {
         assert_eq!(
-            tree, "tree 43f40e5accf591f2187d45ed0b2458d687a13554",
+            tree, "tree 86fd91b1c8d427d3577466833d9d686e85cd48df",
             "Tree OID in commit did not match"
         );
         assert_eq!(msg, "test", "Commit message did not match");

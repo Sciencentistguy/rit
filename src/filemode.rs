@@ -10,6 +10,12 @@ impl std::fmt::Octal for FileMode {
     }
 }
 
+impl std::fmt::Debug for FileMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileMode(0o{:o})", self.0)
+    }
+}
+
 impl FileMode {
     pub const DIRECTORY: FileMode = FileMode(0o040000);
     pub const EXECUTABLE: FileMode = FileMode(0o100755);
