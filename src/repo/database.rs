@@ -1,12 +1,15 @@
+use crate::digest::Digest;
 use crate::storable::Storable;
 use crate::util;
 use crate::Result;
 
+use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
 use color_eyre::eyre::eyre;
+use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use tracing::*;
@@ -23,18 +26,10 @@ impl Database {
     }
 
     pub fn store(&self, obj: &impl Storable) -> Result<()> {
-        trace!(oid=?obj.get_oid(), "Writing object to database");
+        trace!(oid=?obj.oid(), "Writing object to database");
         let content = obj.formatted();
 
-        let object_path = {
-            let mut x = self.database_root.to_owned();
-            let oid = obj.get_oid().to_hex();
-            let (prefix, suffix) = oid.split_at(2);
-            debug_assert_eq!(prefix.len(), 2);
-            x.push(prefix);
-            x.push(suffix);
-            x
-        };
+        let object_path = self.object_path(obj.oid());
 
         if object_path.exists() {
             return Ok(());
@@ -63,5 +58,39 @@ impl Database {
         std::fs::rename(temp_path, object_path)?;
 
         Ok(())
+    }
+
+    fn object_path(&self, oid: &Digest) -> PathBuf {
+        let mut x = self.database_root.to_owned();
+        let oid = oid.to_hex();
+        let (prefix, suffix) = oid.split_at(2);
+        debug_assert_eq!(prefix.len(), 2);
+        x.push(prefix);
+        x.push(suffix);
+        x
+    }
+
+    pub fn exists(&self, oid: &Digest) -> bool {
+        self.object_path(oid).exists()
+    }
+
+    pub fn read(&self, oid: &Digest) -> Result<Vec<u8>> {
+        trace!(object=%oid.to_hex(), "Reading object from database");
+
+        let object_path = self.object_path(oid);
+
+        if !object_path.exists() {
+            return Err(eyre!("object not found in database: {:x}", oid));
+        }
+
+        let compressed = std::fs::read(object_path)?;
+
+        let mut d = ZlibDecoder::new(&*compressed);
+
+        let mut decompressed = Vec::new();
+
+        let _ = d.read_to_end(&mut decompressed)?;
+
+        Ok(decompressed)
     }
 }

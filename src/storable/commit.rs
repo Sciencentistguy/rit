@@ -56,7 +56,7 @@ impl Storable for Commit {
         &self.formatted
     }
 
-    fn get_oid(&self) -> &Digest {
+    fn oid(&self) -> &Digest {
         &self.oid
     }
 

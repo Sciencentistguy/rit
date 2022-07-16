@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod test;
 
+mod cat_file;
 mod digest;
 mod filemode;
 mod interface;
@@ -8,6 +9,8 @@ mod lock;
 mod repo;
 mod storable;
 mod util;
+
+use std::process::{exit, ExitCode};
 
 use color_eyre::eyre::Context;
 pub use color_eyre::Result;
@@ -59,6 +62,8 @@ fn main() -> Result<()> {
         Command::Add { path } => {
             repo.add(path)?;
         }
+
+        Command::CatFile(args) => cat_file::handle(&mut repo, args)?,
     }
     Ok(())
 }
