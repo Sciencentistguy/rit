@@ -5,20 +5,23 @@ mod workspace;
 
 use color_eyre::eyre::eyre;
 use color_eyre::eyre::Context;
-use database::Database;
-// use index::Index;
+use rayon::prelude::*;
 
+use crate::storable::tree::TreeEntry;
 use crate::{
     digest::Digest,
     storable::{blob::Blob, commit::Author, commit::Commit, tree::PartialTree, Storable},
     Result,
 };
 
+use std::os::unix::prelude::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
 
 use tracing::*;
 
+use self::database::Database;
+use self::index::IndexEntry;
 use self::index::IndexWrapper;
 
 pub struct Repo {
@@ -117,6 +120,22 @@ impl Repo {
             }
         }
         self.index.write_out()?;
+
+        Ok(())
+    }
+
+    pub fn status(&self) -> Result<()> {
+        let mut files = self.list_files(Path::new("."))?;
+        files.sort_unstable();
+
+        let index = self.index.entries();
+        let index = index.iter().map(|x| x.path()).collect::<Vec<_>>();
+
+        files.par_iter().for_each(|path| {
+            if !index.contains(&path.as_path()) {
+                println!("?? {}", path.display());
+            }
+        });
 
         Ok(())
     }
