@@ -12,7 +12,7 @@ impl Storable for Blob {
         &self.formatted
     }
 
-    fn get_oid(&self) -> &Digest {
+    fn oid(&self) -> &Digest {
         &self.oid
     }
 

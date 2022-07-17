@@ -160,7 +160,10 @@ impl IndexWrapper {
 
         trace!(?index_path, "Opened index with {} entries", entries.len());
 
-        Self { path: index_path, entries }
+        Self {
+            path: index_path,
+            entries,
+        }
     }
 
     pub fn add(&mut self, path: &Path, oid: &Digest, stat: libc::stat) {
@@ -264,7 +267,6 @@ mod tests {
     fn generate_and_read_index() -> Result<()> {
         let dir = TempDir::new("")?;
         let dir = dir.path();
-
 
         // Test files:
         // - file1: a normal file, chmod 644 (should be stored as REGULAR)

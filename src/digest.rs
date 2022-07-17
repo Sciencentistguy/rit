@@ -2,6 +2,7 @@ use std::{
     fmt::{Debug, LowerHex},
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
+    str::FromStr,
 };
 
 use sha1::{Digest as _, Sha1};
@@ -53,6 +54,16 @@ impl LowerHex for Digest {
 impl Debug for Digest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Digest({})", self.to_hex())
+    }
+}
+
+impl FromStr for Digest {
+    type Err = hex::FromHexError;
+
+    fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
+        let bytes = hex::decode(s)?;
+        assert!(bytes.len() == 20);
+        Ok(Digest(bytes.try_into().unwrap()))
     }
 }
 

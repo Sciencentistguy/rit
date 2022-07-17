@@ -147,7 +147,7 @@ impl Storable for Tree {
         &self.formatted
     }
 
-    fn get_oid(&self) -> &Digest {
+    fn oid(&self) -> &Digest {
         &self.oid
     }
 

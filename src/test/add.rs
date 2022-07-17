@@ -3,6 +3,7 @@ use tempdir::TempDir;
 use crate::repo::Repo;
 use crate::storable::tree::TreeEntry;
 use crate::Result;
+use pretty_assertions::assert_eq;
 
 #[test]
 /// Create files "file1" and "file2". Add these to the index. Then, delete "file1", and create

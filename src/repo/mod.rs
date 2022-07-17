@@ -85,7 +85,7 @@ impl Repo {
 
         let commit = Commit::new(parent_commit, root.into_oid(), author, message);
         self.database.store(&commit)?;
-        self.set_head(commit.get_oid())?;
+        self.set_head(commit.oid())?;
 
         Ok(commit.into_oid())
     }
@@ -107,12 +107,13 @@ impl Repo {
                 trace!(?path, "Adding file");
                 let abs_path = self.dir.join(&path);
 
-                let data = std::fs::read(&abs_path).wrap_err(format!("Failed to read file: {}", abs_path.display()))?;
+                let data = std::fs::read(&abs_path)
+                    .wrap_err(format!("Failed to read file: {}", abs_path.display()))?;
                 let stat = Self::stat_file(&abs_path);
 
                 let blob = Blob::new(&data);
                 self.database.store(&blob)?;
-                self.index.add(path, blob.get_oid(), stat);
+                self.index.add(path, blob.oid(), stat);
             }
         }
         self.index.write_out()?;
