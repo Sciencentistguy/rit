@@ -23,6 +23,7 @@ pub enum Command {
     CatFile(CatFile),
 }
 
+// FIXME: This is exposing the full names of the subcommands.
 #[derive(Clone, Debug, Subcommand)]
 pub enum CatFile {
     /// Exit with status `ExitCode::SUCCESS` if `object` exists and is a valid object. If
