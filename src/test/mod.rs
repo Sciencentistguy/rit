@@ -1,6 +1,5 @@
 mod add;
 mod commit;
-mod commit_hierarchy;
 mod init;
 
 pub const COMMIT_NAME: &str = "Jamie Quigley";
