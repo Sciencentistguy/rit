@@ -13,7 +13,6 @@ flate2 = { version = "1.0.24", features = ["zlib"] }
 hex = "0.4.3"
 libc = "0.2.126"
 once_cell = "1.13.0"
-os_str_bytes = "6.1.0"
 rand = "0.8.5"
 sha-1 = "0.10.0"
 tracing = "0.1.35"
