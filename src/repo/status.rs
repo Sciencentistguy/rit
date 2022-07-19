@@ -19,7 +19,11 @@ impl super::Repo {
         });
 
         self.changed_files(&index).for_each(|path| {
-            println!("!! {}", path.display());
+            println!(" M {}", path.display());
+        });
+
+        self.deleted_files(&index).for_each(|path| {
+            println!(" D {}", path.display());
         });
 
         Ok(())
@@ -30,6 +34,9 @@ impl super::Repo {
         let stat = Self::stat_file(&full_path);
         if !entry.stat_matches(&stat) {
             return Ok(true);
+        }
+        if entry.times_match(&stat) {
+            return Ok(false);
         }
         let data = std::fs::read(full_path)?;
         let new_oid = Blob::new(&data).into_oid();
@@ -53,11 +60,21 @@ impl super::Repo {
     ) -> impl ParallelIterator<Item = &'a Path> + 's {
         index
             .par_iter()
-            .filter(|(&_, &entry)| {
+            .filter(|(_, &entry)| {
                 self.check_index_entry(entry)
                     .expect("Failed to check index entry")
             })
             .map(|(p, _)| *p)
+    }
+
+    pub fn deleted_files<'a: 's, 's>(
+        &'s self,
+        index: &'a HashMap<&Path, &IndexEntry>,
+    ) -> impl ParallelIterator<Item = &'a Path> + 's {
+        index
+            .par_iter()
+            .filter(|(&p, _)| !self.dir.join(p).exists())
+            .map(|(&p, _)| p)
     }
 
     pub fn read_status(&self) -> Result<(Vec<PathBuf>, HashMap<&Path, &IndexEntry>)> {

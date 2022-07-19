@@ -155,3 +155,25 @@ fn test_no_change_touched() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_delete_file() -> Result<()> {
+    let dir = TempDir::new("")?;
+    let dir = dir.path();
+
+    let repo = init_repo(dir)?;
+
+    {
+        let (_, index) = repo.read_status()?;
+        assert_eq!(repo.deleted_files(&index).count(), 0);
+    }
+
+    std::fs::remove_file(dir.join("file1"))?;
+
+    {
+        let (_, index) = repo.read_status()?;
+        assert_eq!(repo.deleted_files(&index).count(), 1);
+    }
+
+    Ok(())
+}

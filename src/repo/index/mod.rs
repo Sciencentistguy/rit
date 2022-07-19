@@ -119,6 +119,13 @@ impl IndexEntry {
         // Fine to cast unconditionally, u32 will always fit in i64
         (self.siz == 0 || self.siz as i64 == stat.st_size) && (FileMode::from(stat) == self.mode)
     }
+
+    pub fn times_match(&self, stat: &libc::stat) -> bool {
+        self.ctime_s as i64 == stat.st_ctime
+            && self.ctime_n as i64 == stat.st_ctime_nsec
+            && self.mtime_s as i64 == stat.st_mtime
+            && self.mtime_n as i64 == stat.st_mtime_nsec
+    }
 }
 
 struct Index {
