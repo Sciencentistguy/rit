@@ -1,5 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
+use tracing::warn;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct FileMode(pub u32);
@@ -43,5 +45,24 @@ impl Deref for FileMode {
 impl DerefMut for FileMode {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl From<&libc::stat> for FileMode {
+    fn from(stat: &libc::stat) -> Self {
+        let actual_mode = FileMode(stat.st_mode);
+
+        if actual_mode != FileMode::REGULAR && actual_mode != FileMode::EXECUTABLE {
+            warn!( 
+                mode=?actual_mode,
+                "Discarding information! Storing file with unsupported mode"
+            );
+        }
+
+        if actual_mode.is_executable() {
+            FileMode::EXECUTABLE
+        } else {
+            FileMode::REGULAR
+        }
     }
 }

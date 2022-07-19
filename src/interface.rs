@@ -21,6 +21,8 @@ pub enum Command {
 
     #[clap(subcommand)]
     CatFile(CatFile),
+
+    Status,
 }
 
 // FIXME: This is exposing the full names of the subcommands.

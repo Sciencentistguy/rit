@@ -50,7 +50,8 @@ fn main() -> Result<()> {
     let mut repo = Repo::open(path)?;
 
     match &ARGS.command {
-        Command::Init => unreachable!(),
+        Command::Init => unreachable!("Init command is handled above"),
+
         Command::Commit { message } => {
             let commit_id = repo.commit(
                 message
@@ -59,11 +60,13 @@ fn main() -> Result<()> {
             )?;
             println!("Created commit {}", commit_id.to_hex())
         }
-        Command::Add { path } => {
-            repo.add(path)?;
-        }
+
+        Command::Add { path } => repo.add(path)?,
 
         Command::CatFile(args) => cat_file::handle(&mut repo, args)?,
+
+        Command::Status => repo.status()?,
     }
+
     Ok(())
 }

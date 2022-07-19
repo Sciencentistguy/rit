@@ -1,12 +1,12 @@
 mod database;
 pub mod index;
 mod refs;
+mod status;
 mod workspace;
 
 use color_eyre::eyre::eyre;
 use color_eyre::eyre::Context;
-use database::Database;
-// use index::Index;
+use tracing::*;
 
 use crate::{
     digest::Digest,
@@ -17,8 +17,7 @@ use crate::{
 use std::path::Path;
 use std::path::PathBuf;
 
-use tracing::*;
-
+use self::database::Database;
 use self::index::IndexWrapper;
 
 pub struct Repo {

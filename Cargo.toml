@@ -14,12 +14,14 @@ hex = "0.4.3"
 libc = "0.2.126"
 once_cell = "1.13.0"
 rand = "0.8.5"
+rayon = "1.5.3"
 sha-1 = "0.10.0"
 tracing = "0.1.35"
 tracing-subscriber = { version = "0.3.14", features = ["env-filter"] }
 walkdir = "2.3.2"
 
 [dev-dependencies]
+filetime = "0.2.17"
 pretty_assertions = "1.2.1"
 tempdir = "0.3.7"
 
