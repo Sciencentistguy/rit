@@ -8,8 +8,8 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use tempdir::TempDir;
 use pretty_assertions::assert_eq;
+use tempdir::TempDir;
 
 #[test]
 /// Create two temporary directories. Create the same set of files in both. In one, use rit to

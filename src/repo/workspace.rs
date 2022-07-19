@@ -24,7 +24,7 @@ impl super::Repo {
                 {
                     continue;
                 }
-                if path.is_dir() {
+                if path.is_dir() && !path.is_symlink() {
                     continue;
                 }
                 entries.push(path.strip_prefix(&self.dir)?.to_owned());

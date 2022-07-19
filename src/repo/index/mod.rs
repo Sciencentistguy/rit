@@ -6,7 +6,7 @@ use std::ffi::OsStr;
 use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
 
-use tracing::trace;
+use tracing::{trace, warn};
 
 use crate::digest::Digest;
 use crate::filemode::FileMode;
@@ -92,12 +92,7 @@ impl IndexEntry {
             .try_into()
             .unwrap_or(Self::MAX_PATH_SIZE);
 
-        let mode = FileMode(stat.st_mode);
-        let mode = if mode.is_executable() {
-            FileMode::EXECUTABLE
-        } else {
-            FileMode::REGULAR
-        };
+        let mode = FileMode::from(&stat);
 
         Ok(Self {
             ctime_s: stat.st_ctime.try_into()?,
@@ -114,6 +109,15 @@ impl IndexEntry {
             flags,
             name,
         })
+    }
+
+    pub fn oid(&self) -> &Digest {
+        &self.oid
+    }
+
+    pub fn stat_matches(&self, stat: &libc::stat) -> bool {
+        // Fine to cast unconditionally, u32 will always fit in i64
+        (self.siz == 0 || self.siz as i64 == stat.st_size) && (FileMode::from(stat) == self.mode)
     }
 }
 
