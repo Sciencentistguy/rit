@@ -1,6 +1,5 @@
-use crate::storable::blob::Blob;
-use crate::storable::tree::TreeEntry;
-use crate::storable::Storable;
+use crate::blob::Blob;
+use crate::storable::DatabaseObject;
 use crate::Result;
 
 use std::collections::HashMap;
@@ -39,7 +38,10 @@ impl super::Repo {
             return Ok(false);
         }
         let data = std::fs::read(full_path)?;
-        let new_oid = Blob::new(&data).into_oid();
+        let blob = Blob::new(data);
+        let blob = DatabaseObject::new(&blob);
+        let new_oid = blob.into_oid();
+
         Ok(*entry.oid() != new_oid)
     }
 

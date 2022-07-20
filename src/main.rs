@@ -3,14 +3,16 @@
 #[cfg(test)]
 mod test;
 
+mod blob;
 mod cat_file;
+mod commit;
 mod digest;
 mod filemode;
 mod interface;
 mod lock;
-mod parse;
 mod repo;
 mod storable;
+mod tree;
 mod util;
 
 use color_eyre::eyre::Context;

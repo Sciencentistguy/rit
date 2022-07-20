@@ -10,8 +10,8 @@ use tracing::{trace, warn};
 
 use crate::digest::Digest;
 use crate::filemode::FileMode;
-use crate::storable::tree::TreeEntry;
 use crate::Result;
+use crate::util::Descends;
 
 struct IndexHeader {
     magic: [u8; 4],
@@ -46,21 +46,27 @@ pub struct IndexEntry {
     name: Vec<u8>,
 }
 
-impl TreeEntry for IndexEntry {
-    fn digest(&self) -> &Digest {
+impl IndexEntry {
+    pub fn digest(&self) -> &Digest {
         &self.oid
     }
 
-    fn mode(&self) -> FileMode {
+    pub fn mode(&self) -> FileMode {
         self.mode
     }
 
-    fn name(&self) -> &[u8] {
+    pub fn name(&self) -> &[u8] {
         self.name.as_ref()
     }
 
-    fn path(&self) -> &Path {
+    pub fn path(&self) -> &Path {
         Path::new(OsStr::from_bytes(self.name.as_ref()))
+    }
+
+    pub fn parents(&self) -> Vec<&Path> {
+        let mut v = self.path().descends();
+        v.pop();
+        v
     }
 }
 

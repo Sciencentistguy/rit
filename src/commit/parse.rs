@@ -1,3 +1,4 @@
+
 use std::str::FromStr;
 
 use color_eyre::eyre::eyre;
@@ -8,28 +9,7 @@ use regex::bytes::Regex;
 use crate::digest::Digest;
 use crate::Result;
 
-struct GpgSig;
-
-#[derive(PartialEq, Eq, Debug)]
-struct Timestamp {
-    unix: u64,
-    offset: i64,
-}
-
-struct Signature {
-    name: String,
-    email: String,
-    when: Timestamp,
-}
-
-struct Commit {
-    tree_id: Digest,
-    parents: Vec<Digest>,
-    author: Signature,
-    committer: Signature,
-    gpgsig: Option<GpgSig>,
-    message: String,
-}
+use super::*;
 
 impl Commit {
     /// Parse a decompressec commit.

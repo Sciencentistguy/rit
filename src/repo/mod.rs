@@ -8,11 +8,9 @@ use color_eyre::eyre::eyre;
 use color_eyre::eyre::Context;
 use tracing::*;
 
-use crate::{
-    digest::Digest,
-    storable::{blob::Blob, commit::Author, commit::Commit, tree::PartialTree, Storable},
-    Result,
-};
+use crate::commit::Commit;
+use crate::storable::DatabaseObject;
+use crate::{blob::Blob, digest::Digest, tree::Tree, Result};
 
 use std::path::Path;
 use std::path::PathBuf;
@@ -67,22 +65,29 @@ impl Repo {
     pub fn commit(&mut self, message: &str) -> Result<Digest> {
         trace!(path=?self.dir, %message, "Starting commit");
         let entries = &self.index.entries();
-        let mut root = PartialTree::build(entries)?;
+        let mut root = Tree::build(entries)?;
         trace!("Traversing root");
-        root.traverse(|tree| self.database.store(&tree.freeze()))?;
+        root.traverse(|tree| self.database.store(&DatabaseObject::new(&*tree)))?;
 
-        let root = root.freeze();
+        let root = DatabaseObject::new(&root);
 
         self.database.store(&root)?;
 
         let parent_commit = self.read_head()?;
 
-        let author = Author {
-            name: std::env::var("RIT_AUTHOR_NAME")?,
-            email: std::env::var("RIT_AUTHOR_EMAIL")?,
-        };
+        let name = std::env::var("RIT_AUTHOR_NAME")?;
+        let email = std::env::var("RIT_AUTHOR_EMAIL")?;
 
-        let commit = Commit::new(parent_commit, root.into_oid(), author, message);
+        let commit = Commit::new(
+            parent_commit,
+            root.into_oid(),
+            name,
+            email,
+            message.to_owned(),
+        );
+
+        let commit = DatabaseObject::new(&commit);
+
         self.database.store(&commit)?;
         self.set_head(commit.oid())?;
 
@@ -110,7 +115,8 @@ impl Repo {
                     .wrap_err(format!("Failed to read file: {}", abs_path.display()))?;
                 let stat = Self::stat_file(&abs_path);
 
-                let blob = Blob::new(&data);
+                let blob = Blob::new(data);
+                let blob = DatabaseObject::new(&blob);
                 self.database.store(&blob)?;
                 self.index.add(path, blob.oid(), stat);
             }

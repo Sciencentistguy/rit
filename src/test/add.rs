@@ -1,7 +1,6 @@
 use tempdir::TempDir;
 
 use crate::repo::Repo;
-use crate::storable::tree::TreeEntry;
 use crate::Result;
 use pretty_assertions::assert_eq;
 

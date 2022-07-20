@@ -1,5 +1,6 @@
 use crate::digest::Digest;
 use crate::storable::Storable;
+use crate::storable::DatabaseObject;
 use crate::util;
 use crate::Result;
 
@@ -25,7 +26,7 @@ impl Database {
         }
     }
 
-    pub fn store(&self, obj: &impl Storable) -> Result<()> {
+    pub fn store<T: Storable>(&self, obj: &DatabaseObject<T>) -> Result<()> {
         trace!(oid=?obj.oid(), "Writing object to database");
         let content = obj.formatted();
 
