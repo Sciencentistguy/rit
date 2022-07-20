@@ -1,4 +1,5 @@
 use crate::blob::Blob;
+use crate::index::IndexEntry;
 use crate::storable::DatabaseObject;
 use crate::Result;
 
@@ -6,8 +7,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
-
-use super::index::IndexEntry;
 
 impl super::Repo {
     pub fn status(&self) -> Result<()> {

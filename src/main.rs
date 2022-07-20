@@ -14,6 +14,7 @@ mod repo;
 mod storable;
 mod tree;
 mod util;
+mod index;
 
 use color_eyre::eyre::Context;
 pub use color_eyre::Result;

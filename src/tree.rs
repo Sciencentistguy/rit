@@ -5,7 +5,7 @@ use once_cell::sync::OnceCell;
 use tracing::*;
 
 use crate::storable::Storable;
-use crate::{filemode::FileMode, repo::index::IndexEntry, Digest};
+use crate::{filemode::FileMode, index::IndexEntry, Digest};
 
 #[derive(Debug)]
 enum TreeEntry {

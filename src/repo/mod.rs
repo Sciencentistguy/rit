@@ -1,5 +1,4 @@
 mod database;
-pub mod index;
 mod refs;
 mod status;
 mod workspace;
@@ -9,6 +8,7 @@ use color_eyre::eyre::Context;
 use tracing::*;
 
 use crate::commit::Commit;
+use crate::index::IndexWrapper;
 use crate::storable::DatabaseObject;
 use crate::{blob::Blob, digest::Digest, tree::Tree, Result};
 
@@ -16,7 +16,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use self::database::Database;
-use self::index::IndexWrapper;
 
 pub struct Repo {
     pub dir: PathBuf,
