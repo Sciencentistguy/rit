@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[cfg(test)]
 mod test;
 
@@ -6,11 +8,10 @@ mod digest;
 mod filemode;
 mod interface;
 mod lock;
+mod parse;
 mod repo;
 mod storable;
 mod util;
-
-use std::process::{exit, ExitCode};
 
 use color_eyre::eyre::Context;
 pub use color_eyre::Result;
