@@ -1,7 +1,6 @@
-use std::ffi::CString;
+use std::io::Write;
 use std::os::unix::prelude::PermissionsExt;
 use std::path::Path;
-use std::{io::Write, os::unix::prelude::OsStrExt};
 
 use rand::prelude::*;
 use rayon::prelude::*;

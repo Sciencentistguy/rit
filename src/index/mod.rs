@@ -6,12 +6,12 @@ use std::ffi::OsStr;
 use std::os::unix::prelude::OsStrExt;
 use std::path::{Path, PathBuf};
 
-use tracing::{trace, warn};
+use tracing::trace;
 
 use crate::digest::Digest;
 use crate::filemode::FileMode;
-use crate::Result;
 use crate::util::Descends;
+use crate::Result;
 
 struct IndexHeader {
     magic: [u8; 4],

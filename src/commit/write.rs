@@ -2,7 +2,6 @@ use crate::storable::Storable;
 
 use tracing::warn;
 
-
 impl Storable for super::Commit {
     fn format(&self) -> Vec<u8> {
         let data = format!(
@@ -18,32 +17,14 @@ impl Storable for super::Commit {
                 warn!("Only writing first parent, NYI");
                 format!("parent {parent:x}\n")
             } else {
-                "".into()
+                String::new()
             },
             self.author.name,
             self.author.email,
-            format!(
-                "{} {}{:04}",
-                self.author.when.unix,
-                if self.author.when.offset.is_negative() {
-                    '-'
-                } else {
-                    '+'
-                },
-                self.author.when.offset.abs()
-            ),
-            self.author.name,
-            self.author.email,
-            format!(
-                "{} {}{:04}",
-                self.committer.when.unix,
-                if self.committer.when.offset.is_negative() {
-                    '-'
-                } else {
-                    '+'
-                },
-                self.committer.when.offset.abs()
-            ),
+            self.author.when.format(),
+            self.committer.name,
+            self.committer.email,
+            self.committer.when.format(),
             self.message
         );
         let mut formatted = Vec::new();
