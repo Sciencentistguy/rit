@@ -125,10 +125,15 @@ impl Storable for Tree {
 
         let oid = Digest::new(&formatted);
 
-        match self.oid.set(oid.clone()) {
+        match self.oid.set(oid) {
             Ok(_) => {}
-            Err(e) => {
-                assert!(oid == e);
+            Err(oid) => {
+                if cfg!(debug_asserts) {
+                    let old = self.oid.get().unwrap();
+                    if *old != oid {
+                        panic!("oid changed during formatting");
+                    }
+                }
             }
         }
 
