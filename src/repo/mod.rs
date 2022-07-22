@@ -1,16 +1,15 @@
+mod add;
+mod commit;
 mod database;
 mod refs;
 mod status;
 mod workspace;
 
 use color_eyre::eyre::eyre;
-use color_eyre::eyre::Context;
 use tracing::*;
 
-use crate::commit::Commit;
 use crate::index::IndexWrapper;
-use crate::storable::DatabaseObject;
-use crate::{blob::Blob, digest::Digest, tree::Tree, Result};
+use crate::Result;
 
 use std::path::Path;
 use std::path::PathBuf;
@@ -58,70 +57,6 @@ impl Repo {
                 std::fs::create_dir_all(dir)?;
             }
         }
-        Ok(())
-    }
-
-    pub fn commit(&mut self, message: &str) -> Result<Digest> {
-        trace!(path=?self.dir, %message, "Starting commit");
-        let entries = &self.index.entries();
-        let mut root = Tree::build(entries)?;
-        trace!("Traversing root");
-        root.traverse(|tree| self.database.store(&DatabaseObject::new(&*tree)))?;
-
-        let root = DatabaseObject::new(&root);
-
-        self.database.store(&root)?;
-
-        let parent_commit = self.read_head()?;
-
-        let name = std::env::var("RIT_AUTHOR_NAME")?;
-        let email = std::env::var("RIT_AUTHOR_EMAIL")?;
-
-        let commit = Commit::new(
-            parent_commit,
-            root.into_oid(),
-            name,
-            email,
-            message.to_owned(),
-        );
-
-        let commit = DatabaseObject::new(&commit);
-
-        self.database.store(&commit)?;
-        self.set_head(commit.oid())?;
-
-        Ok(commit.into_oid())
-    }
-
-    pub fn add(&mut self, paths: &[PathBuf]) -> Result<()> {
-        for path in paths {
-            trace!(?path, "Adding file to repo");
-            if !self.dir.join(path).exists() {
-                return Err(eyre!("Path does not exist: {}", path.display()));
-            }
-            let paths = self.list_files(path)?;
-            for path in paths {
-                let path = if path.has_root() {
-                    path.strip_prefix(&self.dir)
-                        .wrap_err(format!("Path: {:?}", path))?
-                } else {
-                    &path
-                };
-                trace!(?path, "Adding file");
-                let abs_path = self.dir.join(&path);
-
-                let data = std::fs::read(&abs_path)
-                    .wrap_err(format!("Failed to read file: {}", abs_path.display()))?;
-                let stat = Self::stat_file(&abs_path);
-
-                let blob = Blob::new(data);
-                let blob = DatabaseObject::new(&blob);
-                self.database.store(&blob)?;
-                self.index.add(path, blob.oid(), stat);
-            }
-        }
-        self.index.write_out()?;
-
         Ok(())
     }
 }

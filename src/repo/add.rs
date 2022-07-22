@@ -1,0 +1,40 @@
+use std::path::PathBuf;
+
+use color_eyre::eyre::{eyre, Context};
+use tracing::trace;
+
+use crate::{blob::Blob, storable::DatabaseObject, Result};
+
+impl super::Repo {
+    pub fn add(&mut self, paths: &[PathBuf]) -> Result<()> {
+        for path in paths {
+            trace!(?path, "Adding file to repo");
+            if !self.dir.join(path).exists() {
+                return Err(eyre!("Path does not exist: {}", path.display()));
+            }
+            let paths = self.list_files(path)?;
+            for path in paths {
+                let path = if path.has_root() {
+                    path.strip_prefix(&self.dir)
+                        .wrap_err(format!("Path: {:?}", path))?
+                } else {
+                    &path
+                };
+                trace!(?path, "Adding file");
+                let abs_path = self.dir.join(&path);
+
+                let data = std::fs::read(&abs_path)
+                    .wrap_err(format!("Failed to read file: {}", abs_path.display()))?;
+                let stat = Self::stat_file(&abs_path);
+
+                let blob = Blob::new(data);
+                let blob = DatabaseObject::new(&blob);
+                self.database.store(&blob)?;
+                self.index.add(path, blob.oid(), stat);
+            }
+        }
+        self.index.write_out()?;
+
+        Ok(())
+    }
+}
