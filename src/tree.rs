@@ -49,11 +49,11 @@ impl Tree {
         Ok(root)
     }
 
-    pub fn traverse<F>(&mut self, f: F) -> Result<()>
+    pub fn traverse<F>(&self, f: F) -> Result<()>
     where
-        F: Fn(&mut Self) -> Result<()> + Copy,
+        F: Fn(&Self) -> Result<()> + Copy,
     {
-        for (name, entry) in self.entries.iter_mut() {
+        for (name, entry) in self.entries.iter() {
             if let TreeEntry::Directory(entry) = entry {
                 trace!(%name, "Traversing subtree");
                 entry.traverse(f)?;
@@ -69,7 +69,7 @@ impl Tree {
                 .file_name()
                 .expect("Entry with no parents must have a filename")
                 .to_str()
-                .expect("file name should be utf-8");
+                .expect("File name should be utf-8");
             let filename = filename;
             self.entries
                 .insert(filename.to_owned(), TreeEntry::File(entry.clone()));
@@ -80,9 +80,9 @@ impl Tree {
                 .entry(
                     parents[0]
                         .file_name()
-                        .expect("should have a file name")
+                        .expect("Entry should have a file name")
                         .to_str()
-                        .expect("file name should be utf-8")
+                        .expect("File name should be utf-8")
                         .to_owned(),
                 )
                 .or_insert(TreeEntry::Directory(tree));
@@ -121,22 +121,26 @@ impl Storable for Tree {
         formatted.push(b'\0');
         formatted.extend_from_slice(&data);
 
-        // XXX: hashing twice
-
         let oid = Digest::new(&formatted);
 
         match self.oid.set(oid) {
             Ok(_) => {}
             Err(oid) => {
-                if cfg!(debug_asserts) {
-                    let old = self.oid.get().unwrap();
-                    if *old != oid {
-                        panic!("oid changed during formatting");
-                    }
-                }
+                debug_assert_eq!(
+                    oid,
+                    self.oid.get().cloned().unwrap(),
+                    "Oid should not change during formatting"
+                );
             }
         }
 
         formatted
+    }
+
+    fn oid(&self, _: &[u8]) -> Digest {
+        self.oid
+            .get()
+            .cloned()
+            .expect("oid should have been inited")
     }
 }

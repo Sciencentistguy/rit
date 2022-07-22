@@ -6,6 +6,10 @@ pub trait Storable {
     /// ## Example
     /// A blob with contents `"hello\n"` becomes `"blob 6\0hello\n"`
     fn format(&self) -> Vec<u8>;
+
+    fn oid(&self, formatted: &[u8]) -> Digest {
+        Digest::new(formatted)
+    }
 }
 
 /// A wrapper for a type that can be stored in the database.
@@ -23,7 +27,8 @@ where
 impl<'a, T: Storable> DatabaseObject<'a, T> {
     pub fn new(inner: &'a T) -> Self {
         let formatted = inner.format();
-        let oid = Digest::new(&formatted);
+        let oid = inner.oid(&formatted);
+
         Self {
             inner,
             formatted,
