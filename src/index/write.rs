@@ -72,7 +72,7 @@ fn write_index_entry(
     out.extend_from_slice(&flags.to_be_bytes());
 
     // We don't store the null terminator in IndexEntry::name. Re-add it here
-    out.extend_from_slice(name);
+    out.extend_from_slice(name.as_bytes());
     out.push(b'\0');
 
     let len = out.len() - start_len;

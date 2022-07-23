@@ -1,16 +1,15 @@
-use std::path::PathBuf;
-
+use camino::Utf8PathBuf;
 use color_eyre::eyre::{eyre, Context};
 use tracing::trace;
 
 use crate::{blob::Blob, storable::DatabaseObject, Result};
 
 impl super::Repo {
-    pub fn add(&mut self, paths: &[PathBuf]) -> Result<()> {
+    pub fn add(&mut self, paths: &[Utf8PathBuf]) -> Result<()> {
         for path in paths {
             trace!(?path, "Adding file to repo");
             if !self.dir.join(path).exists() {
-                return Err(eyre!("Path does not exist: {}", path.display()));
+                return Err(eyre!("Path does not exist: {}", path));
             }
             let paths = self.list_files(path)?;
             for path in paths {
@@ -24,7 +23,7 @@ impl super::Repo {
                 let abs_path = self.dir.join(&path);
 
                 let data = std::fs::read(&abs_path)
-                    .wrap_err(format!("Failed to read file: {}", abs_path.display()))?;
+                    .wrap_err(format!("Failed to read file: {}", abs_path))?;
                 let stat = Self::stat_file(&abs_path);
 
                 let blob = Blob::new(data);

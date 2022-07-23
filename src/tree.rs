@@ -1,5 +1,6 @@
-use std::{collections::BTreeMap, path::Path};
+use std::collections::BTreeMap;
 
+use camino::Utf8Path;
 use color_eyre::Result;
 use once_cell::sync::OnceCell;
 use tracing::*;
@@ -40,7 +41,7 @@ impl Tree {
         let mut root = Tree::new();
 
         for entry in entries {
-            trace!(entry=?std::str::from_utf8(entry.name()), "Inserting entry into tree");
+            trace!(entry = entry.name(), "Inserting entry into tree");
             let parents = entry.parents();
             trace!(?parents, "Parents of entry");
             root.add_entry(&parents, entry)?;
@@ -62,15 +63,12 @@ impl Tree {
         f(self)
     }
 
-    fn add_entry(&mut self, parents: &[&'_ Path], entry: &IndexEntry) -> Result<()> {
+    fn add_entry(&mut self, parents: &[&'_ Utf8Path], entry: &IndexEntry) -> Result<()> {
         if parents.is_empty() {
             let filename = entry
                 .path()
                 .file_name()
-                .expect("Entry with no parents must have a filename")
-                .to_str()
-                .expect("File name should be utf-8");
-            let filename = filename;
+                .expect("Entry with no parents must have a filename");
             self.entries
                 .insert(filename.to_owned(), TreeEntry::File(entry.clone()));
         } else {
@@ -81,8 +79,6 @@ impl Tree {
                     parents[0]
                         .file_name()
                         .expect("Entry should have a file name")
-                        .to_str()
-                        .expect("File name should be utf-8")
                         .to_owned(),
                 )
                 .or_insert(TreeEntry::Directory(tree));

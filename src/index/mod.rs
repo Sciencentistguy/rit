@@ -1,10 +1,8 @@
 mod parse;
 mod write;
 
+use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::HashSet;
-use std::ffi::OsStr;
-use std::os::unix::prelude::OsStrExt;
-use std::path::{Path, PathBuf};
 
 use tracing::trace;
 
@@ -43,7 +41,7 @@ pub struct IndexEntry {
     siz: u32,
     oid: Digest,
     flags: u16,
-    name: Vec<u8>,
+    name: String,
 }
 
 impl IndexEntry {
@@ -55,15 +53,15 @@ impl IndexEntry {
         self.mode
     }
 
-    pub fn name(&self) -> &[u8] {
-        self.name.as_ref()
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
-    pub fn path(&self) -> &Path {
-        Path::new(OsStr::from_bytes(self.name.as_ref()))
+    pub fn path(&self) -> &Utf8Path {
+        Utf8Path::new(&self.name)
     }
 
-    pub fn parents(&self) -> Vec<&Path> {
+    pub fn parents(&self) -> Vec<&Utf8Path> {
         let mut v = self.path().descends();
         v.pop();
         v
@@ -84,13 +82,8 @@ impl PartialOrd for IndexEntry {
 impl IndexEntry {
     const MAX_PATH_SIZE: u16 = 0xfff;
 
-    fn create(path: &Path, oid: &Digest, stat: libc::stat) -> Result<Self> {
-        let name = path
-            // .file_name()
-            // .expect("File should have name")
-            .as_os_str()
-            .as_bytes()
-            .to_owned();
+    fn create(path: &Utf8Path, oid: &Digest, stat: libc::stat) -> Result<Self> {
+        let name = path.as_str().to_owned();
 
         let flags = path
             .as_os_str()
@@ -160,17 +153,17 @@ impl Index {
 
 #[derive(Debug)]
 pub struct IndexWrapper {
-    path: PathBuf,
+    path: Utf8PathBuf,
     //FIXME: this could be a Cow
     entries: Vec<IndexEntry>,
 }
 
 impl IndexWrapper {
-    pub fn open(git_folder: &Path) -> Self {
+    pub fn open(git_folder: &Utf8Path) -> Self {
         let index_path = git_folder.join("index");
         let entries = (|| -> Result<Vec<IndexEntry>> {
             let current_index = std::fs::read(&index_path)?;
-            let current_index = parse::parse_index(&current_index);
+            let current_index = parse::parse_index(&current_index)?;
             Ok(current_index.entries)
         })()
         .unwrap_or_else(|_| Vec::new());
@@ -183,7 +176,7 @@ impl IndexWrapper {
         }
     }
 
-    pub fn add(&mut self, path: &Path, oid: &Digest, stat: libc::stat) {
+    pub fn add(&mut self, path: &Utf8Path, oid: &Digest, stat: libc::stat) {
         trace!(?path, "Adding entry to index");
         let entry = IndexEntry::create(path, oid, stat).unwrap();
 
@@ -240,6 +233,7 @@ mod tests {
     use std::os::unix::prelude::PermissionsExt;
     use std::process::{Command, Stdio};
 
+    use camino::Utf8Path;
     use tempdir::TempDir;
 
     use super::{parse::*, write::*};
@@ -256,11 +250,10 @@ mod tests {
     fn read_write_index() {
         const TEST_GIT_REPO_PATH: &str = "/home/jamie/Git/nixpkgs-official/.git/index";
         let bytes = std::fs::read(TEST_GIT_REPO_PATH).unwrap();
-        let idx = parse_index(&bytes);
+        let idx = parse_index(&bytes).unwrap();
 
         for e in &idx.entries {
-            let name = std::str::from_utf8(&e.name);
-            println!("{:?}", name);
+            println!("{:?}", e.name);
         }
 
         let new_bytes = write_index(&idx);
@@ -284,6 +277,7 @@ mod tests {
     fn generate_and_read_index() -> Result<()> {
         let dir = TempDir::new("")?;
         let dir = dir.path();
+        let dir = Utf8Path::from_path(dir).unwrap();
 
         // Test files:
         // - file1: a normal file, chmod 644 (should be stored as REGULAR)

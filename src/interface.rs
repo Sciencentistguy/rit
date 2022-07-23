@@ -1,5 +1,4 @@
-use std::path::PathBuf;
-
+use camino::Utf8PathBuf;
 use clap::Parser;
 use clap::Subcommand;
 
@@ -16,7 +15,7 @@ pub enum Command {
 
     Add {
         #[clap(env = "RIT_ADD_PATH", multiple_values = true)]
-        path: Vec<PathBuf>,
+        path: Vec<Utf8PathBuf>,
     },
 
     #[clap(subcommand)]
@@ -77,5 +76,5 @@ pub struct Opt {
 
     /// The path to be used.
     #[clap(short)]
-    pub path: Option<PathBuf>,
+    pub path: Option<Utf8PathBuf>,
 }

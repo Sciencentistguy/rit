@@ -1,14 +1,13 @@
 use crate::digest::Digest;
-use crate::storable::Storable;
 use crate::storable::DatabaseObject;
+use crate::storable::Storable;
 use crate::util;
 use crate::Result;
 
 use std::io::Read;
 use std::io::Write;
-use std::path::Path;
-use std::path::PathBuf;
 
+use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
@@ -16,11 +15,11 @@ use flate2::Compression;
 use tracing::*;
 
 pub struct Database {
-    database_root: PathBuf,
+    database_root: Utf8PathBuf,
 }
 
 impl Database {
-    pub fn new(git_folder: impl AsRef<Path>) -> Self {
+    pub fn new(git_folder: impl AsRef<Utf8Path>) -> Self {
         Self {
             database_root: git_folder.as_ref().join("objects"),
         }
@@ -61,7 +60,7 @@ impl Database {
         Ok(())
     }
 
-    fn object_path(&self, oid: &Digest) -> PathBuf {
+    fn object_path(&self, oid: &Digest) -> Utf8PathBuf {
         let mut x = self.database_root.to_owned();
         let oid = oid.to_hex();
         let (prefix, suffix) = oid.split_at(2);

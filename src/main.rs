@@ -8,14 +8,15 @@ mod cat_file;
 mod commit;
 mod digest;
 mod filemode;
+mod index;
 mod interface;
 mod lock;
 mod repo;
 mod storable;
 mod tree;
 mod util;
-mod index;
 
+use camino::Utf8PathBuf;
 use color_eyre::eyre::Context;
 pub use color_eyre::Result;
 
@@ -41,9 +42,12 @@ fn main() -> Result<()> {
 
     let path = match ARGS.path {
         Some(ref path) => path
-            .canonicalize()
-            .wrap_err(format!("Directory not found: '{}'", path.display()))?,
-        None => std::env::current_dir()?.canonicalize()?,
+            .canonicalize_utf8()
+            .wrap_err(format!("Failed to canonicalize path: '{}'", path))?,
+        None => {
+            let cwd = std::env::current_dir()?.canonicalize()?;
+            Utf8PathBuf::from_path_buf(cwd).expect("Path must be valdi UTF-8")
+        }
     };
 
     if matches!(ARGS.command, Command::Init) {

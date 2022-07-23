@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::os::unix::prelude::PermissionsExt;
-use std::path::Path;
 
+use camino::Utf8Path;
 use rand::prelude::*;
 use rayon::prelude::*;
 use tempdir::TempDir;
@@ -12,7 +12,7 @@ use crate::{
     Result,
 };
 
-fn init_repo(dir: &Path) -> Result<Repo> {
+fn init_repo(dir: &Utf8Path) -> Result<Repo> {
     std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
     std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
 
@@ -30,6 +30,7 @@ fn init_repo(dir: &Path) -> Result<Repo> {
 fn test_untracked() -> Result<()> {
     let dir = TempDir::new("")?;
     let dir = dir.path();
+    let dir = Utf8Path::from_path(dir).unwrap();
 
     let repo = init_repo(dir)?;
 
@@ -52,6 +53,7 @@ fn test_untracked() -> Result<()> {
 fn test_change_file_contents() -> Result<()> {
     let dir = TempDir::new("")?;
     let dir = dir.path();
+    let dir = Utf8Path::from_path(dir).unwrap();
 
     let repo = init_repo(dir)?;
 
@@ -79,6 +81,7 @@ fn test_change_file_contents() -> Result<()> {
 fn test_change_file_mode() -> Result<()> {
     let dir = TempDir::new("")?;
     let dir = dir.path();
+    let dir = Utf8Path::from_path(dir).unwrap();
 
     let repo = init_repo(dir)?;
 
@@ -104,6 +107,7 @@ fn test_change_file_mode() -> Result<()> {
 fn test_change_file_preserve_size() -> Result<()> {
     let dir = TempDir::new("")?;
     let dir = dir.path();
+    let dir = Utf8Path::from_path(dir).unwrap();
 
     let repo = init_repo(dir)?;
 
@@ -137,6 +141,7 @@ fn test_change_file_preserve_size() -> Result<()> {
 fn test_no_change_touched() -> Result<()> {
     let dir = TempDir::new("")?;
     let dir = dir.path();
+    let dir = Utf8Path::from_path(dir).unwrap();
 
     let repo = init_repo(dir)?;
 
@@ -159,6 +164,7 @@ fn test_no_change_touched() -> Result<()> {
 fn test_delete_file() -> Result<()> {
     let dir = TempDir::new("")?;
     let dir = dir.path();
+    let dir = Utf8Path::from_path(dir).unwrap();
 
     let repo = init_repo(dir)?;
 

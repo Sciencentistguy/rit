@@ -15,10 +15,7 @@ pub trait Storable {
 /// A wrapper for a type that can be stored in the database.
 ///
 /// Constructing this type ensures that the data is formatted correctly for storage, and has an oid
-pub struct DatabaseObject<'a, T>
-where
-    T: Storable,
-{
+pub struct DatabaseObject<'a, T: Storable> {
     pub inner: &'a T,
     formatted: Vec<u8>,
     oid: Digest,

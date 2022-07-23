@@ -5,31 +5,29 @@ mod refs;
 mod status;
 mod workspace;
 
+use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use tracing::*;
 
 use crate::index::IndexWrapper;
 use crate::Result;
 
-use std::path::Path;
-use std::path::PathBuf;
-
 use self::database::Database;
 
 pub struct Repo {
-    pub dir: PathBuf,
-    pub head_path: PathBuf,
+    pub dir: Utf8PathBuf,
+    pub head_path: Utf8PathBuf,
     pub database: Database,
     pub index: IndexWrapper,
 }
 
 impl Repo {
-    pub fn open(repo_root: PathBuf) -> Result<Self> {
+    pub fn open(repo_root: Utf8PathBuf) -> Result<Self> {
         let git_dir = repo_root.join(".git");
         if !git_dir.exists() {
             return Err(eyre!(
                 "Failed to open repository: directory is not a git repository: '{}'",
-                repo_root.display()
+                repo_root
             ));
         }
 
@@ -45,7 +43,7 @@ impl Repo {
         })
     }
 
-    pub fn init(path: &Path) -> Result<()> {
+    pub fn init(path: &Utf8Path) -> Result<()> {
         trace!(?path, "Initialising repo");
         let git_dir = path.join(".git");
         if git_dir.exists() {

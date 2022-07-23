@@ -3,8 +3,9 @@ use tracing::{trace, warn};
 use super::{Index, IndexEntry, IndexHeader};
 use crate::util::align_to;
 use crate::Digest;
+use crate::Result;
 
-pub(super) fn parse_index(bytes: &[u8]) -> Index {
+pub(super) fn parse_index(bytes: &[u8]) -> Result<Index> {
     trace!("Parsing bytes as index...");
 
     let header = parse_index_header(bytes[..12].try_into().unwrap());
@@ -28,7 +29,7 @@ pub(super) fn parse_index(bytes: &[u8]) -> Index {
     trace!("Parsing index entries...");
     for _ in 0..header.num_entries {
         let entry = parse_index_entry(&mut offset, bytes);
-        entries.push(entry);
+        entries.push(entry?);
     }
     trace!("Parsing index entries... done");
 
@@ -40,7 +41,7 @@ pub(super) fn parse_index(bytes: &[u8]) -> Index {
     let _oid = Digest(bytes[bytes.len() - 20..].try_into().unwrap());
 
     trace!("Parsing bytes as index... done");
-    Index { header, entries }
+    Ok(Index { header, entries })
 }
 
 fn parse_index_header(bytes: &[u8; 12]) -> IndexHeader {
@@ -56,7 +57,7 @@ fn parse_index_header(bytes: &[u8; 12]) -> IndexHeader {
     }
 }
 
-fn parse_index_entry(offset: &mut usize, bytes: &[u8]) -> IndexEntry {
+fn parse_index_entry(offset: &mut usize, bytes: &[u8]) -> Result<IndexEntry> {
     let ctime_s = u32::from_be_bytes(bytes[*offset..*offset + 4].try_into().unwrap());
     *offset += 4;
     let ctime_n = u32::from_be_bytes(bytes[*offset..*offset + 4].try_into().unwrap());
@@ -92,13 +93,13 @@ fn parse_index_entry(offset: &mut usize, bytes: &[u8]) -> IndexEntry {
         let len = unsafe { libc::strlen(bytes.as_ptr().add(*offset).cast()) };
         let slc = &bytes[*offset..*offset + len];
         *offset += len + 1;
-        slc.to_owned()
+        String::from_utf8(slc.to_owned())?
     };
 
     // Pad the end of the name with NUL bytes to align the next entry to multiples of 8
     *offset = align_to(8, *offset);
 
-    IndexEntry {
+    Ok(IndexEntry {
         ctime_s,
         ctime_n,
         mtime_s,
@@ -112,5 +113,5 @@ fn parse_index_entry(offset: &mut usize, bytes: &[u8]) -> IndexEntry {
         oid,
         flags,
         name,
-    }
+    })
 }
