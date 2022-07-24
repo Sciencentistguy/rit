@@ -1,6 +1,9 @@
+use crate::blob::Blob;
+use crate::commit::Commit;
 use crate::digest::Digest;
 use crate::storable::DatabaseObject;
 use crate::storable::Storable;
+use crate::tree::Tree;
 use crate::util;
 use crate::Result;
 
@@ -92,5 +95,83 @@ impl Database {
         let _ = d.read_to_end(&mut decompressed)?;
 
         Ok(decompressed)
+    }
+
+    fn load(&self, oid: &Digest) -> Result<LoadedItem> {
+        let mut bytes = self.read(oid)?;
+
+        let space_idx = bytes.iter().position(|&b| b == b' ').unwrap();
+        let nul_idx = bytes.iter().position(|&b| b == b'\0').unwrap();
+        let r#type = &bytes[..space_idx];
+        debug_assert!({
+            let len = &bytes[space_idx + 1..nul_idx];
+            let len = std::str::from_utf8(len)?;
+            len.parse::<usize>()? > 0
+        });
+
+        let content_start = nul_idx + 1;
+
+        match r#type {
+            b"blob" => {
+                bytes.drain(0..content_start);
+                assert!(bytes.starts_with(b"blob"));
+                Ok(LoadedItem::Blob(Blob::new(bytes)))
+            }
+            b"tree" => {
+                let bytes = &bytes[content_start..];
+                Ok(LoadedItem::Tree(Tree::parse(bytes)?))
+            }
+            b"commit" => {
+                let bytes = &bytes[content_start..];
+                Ok(LoadedItem::Commit(Commit::parse(bytes)?))
+                // commit
+            }
+            _ => unreachable!("Unexpected object type: {}", std::str::from_utf8(r#type)?),
+        }
+    }
+}
+
+pub enum LoadedItem {
+    Commit(Commit),
+    Tree(Tree),
+    Blob(Blob),
+}
+
+#[cfg(test)]
+mod tests {
+    use tempdir::TempDir;
+
+    use crate::{
+        repo::Repo,
+        test::{COMMIT_EMAIL, COMMIT_NAME},
+    };
+
+    use super::*;
+
+    #[test]
+    fn works() -> Result<()> {
+        std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
+        std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
+
+        let root = TempDir::new("")?;
+        let root = root.path();
+        let root = Utf8Path::from_path(root).unwrap();
+
+        Repo::init(root)?;
+        let mut repo = Repo::open(root.to_owned())?;
+
+        crate::create_test_files!(root, ["file1"]);
+
+        repo.add(&[".".into()])?;
+
+        let oid = repo.commit("test")?;
+
+        let bytes = repo.database.read(&oid)?;
+
+        let string = std::str::from_utf8(&bytes)?;
+
+        println!("{string}");
+
+        Ok(())
     }
 }
