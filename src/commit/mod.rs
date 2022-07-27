@@ -79,4 +79,8 @@ impl Commit {
             message,
         }
     }
+
+    pub fn tree_id(&self) -> &Digest {
+        &self.tree_id
+    }
 }

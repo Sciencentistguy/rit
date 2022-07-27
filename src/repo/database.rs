@@ -77,7 +77,7 @@ impl Database {
         self.object_path(oid).exists()
     }
 
-    pub fn read(&self, oid: &Digest) -> Result<Vec<u8>> {
+    pub fn read_to_vec(&self, oid: &Digest) -> Result<Vec<u8>> {
         trace!(object=%oid.to_hex(), "Reading object from database");
 
         let object_path = self.object_path(oid);
@@ -97,8 +97,8 @@ impl Database {
         Ok(decompressed)
     }
 
-    fn load(&self, oid: &Digest) -> Result<LoadedItem> {
-        let mut bytes = self.read(oid)?;
+    pub fn load(&self, oid: &Digest) -> Result<LoadedItem> {
+        let mut bytes = self.read_to_vec(oid)?;
 
         let space_idx = bytes.iter().position(|&b| b == b' ').unwrap();
         let nul_idx = bytes.iter().position(|&b| b == b'\0').unwrap();
@@ -114,7 +114,6 @@ impl Database {
         match r#type {
             b"blob" => {
                 bytes.drain(0..content_start);
-                assert!(bytes.starts_with(b"blob"));
                 Ok(LoadedItem::Blob(Blob::new(bytes)))
             }
             b"tree" => {
@@ -124,7 +123,6 @@ impl Database {
             b"commit" => {
                 let bytes = &bytes[content_start..];
                 Ok(LoadedItem::Commit(Commit::parse(bytes)?))
-                // commit
             }
             _ => unreachable!("Unexpected object type: {}", std::str::from_utf8(r#type)?),
         }
@@ -137,19 +135,52 @@ pub enum LoadedItem {
     Blob(Blob),
 }
 
+impl LoadedItem {
+    pub fn as_commit(&self) -> Option<&Commit> {
+        if let Self::Commit(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_tree(&self) -> Option<&Tree> {
+        if let Self::Tree(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_blob(&self) -> Option<&Blob> {
+        if let Self::Blob(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use tempdir::TempDir;
 
     use crate::{
         repo::Repo,
         test::{COMMIT_EMAIL, COMMIT_NAME},
+        tree::TreeEntry,
     };
 
     use super::*;
 
     #[test]
-    fn works() -> Result<()> {
+    /// Create a dir, add a file, commit it. Then use git cat-file to get the tree_id of that
+    /// commit. Seperately, parse that commit using Database::load. The tree_id should be the same.
+    /// Then load the tree and check that the name of the first entry is as expected.
+    /// Load the blob from that file oid, and that should match the contents of the file (known)
+    fn test_database_load() -> Result<()> {
         std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
         std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
 
@@ -164,13 +195,33 @@ mod tests {
 
         repo.add(&[".".into()])?;
 
-        let oid = repo.commit("test")?;
+        let commit_id = repo.commit("test")?;
 
-        let bytes = repo.database.read(&oid)?;
+        let commit = repo.database.load(&commit_id)?;
+        let commit = commit.as_commit().unwrap();
 
-        let string = std::str::from_utf8(&bytes)?;
+        let commit_text = crate::test::git_cat_file(root.as_std_path(), &commit_id)?;
 
-        println!("{string}");
+        let tid = commit_text.lines().next().unwrap().split_at(5).1;
+        let tid = Digest::from_str(tid)?;
+
+        assert_eq!(commit.tree_id(), &tid);
+
+        let tree = repo.database.load(&tid)?;
+        let tree = tree.as_tree().unwrap();
+
+        let (name, entry) = tree.entries().iter().next().unwrap();
+
+        assert_eq!(name, "file1");
+
+        let blob_id = entry.oid().unwrap();
+
+        let blob = repo.database.load(blob_id)?;
+        let blob = blob.as_blob().unwrap();
+
+        let expected = crate::test_file_contents!("file1");
+
+        assert_eq!(blob.data(), expected.as_bytes());
 
         Ok(())
     }

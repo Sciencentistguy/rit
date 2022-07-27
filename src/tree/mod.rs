@@ -8,13 +8,17 @@ use color_eyre::Result;
 use once_cell::sync::OnceCell;
 use tracing::*;
 
-use crate::storable::Storable;
 use crate::{filemode::FileMode, index::IndexEntry, Digest};
 
 #[derive(Debug)]
-enum TreeEntry {
+pub enum TreeEntry {
     File(IndexEntry),
     Directory(Tree),
+    Database {
+        oid: Digest,
+        name: String,
+        mode: FileMode,
+    },
 }
 
 impl TreeEntry {
@@ -22,6 +26,19 @@ impl TreeEntry {
         match self {
             TreeEntry::File(f) => f.mode(),
             TreeEntry::Directory(_) => FileMode::DIRECTORY,
+            TreeEntry::Database {
+                oid: _,
+                name: _,
+                mode,
+            } => *mode,
+        }
+    }
+
+    pub fn oid(&self) -> Option<&Digest> {
+        match self {
+            TreeEntry::File(f) => Some(f.oid()),
+            TreeEntry::Directory(t) => t.oid.get(),
+            TreeEntry::Database { oid, .. } => Some(oid),
         }
     }
 }
@@ -94,5 +111,9 @@ impl Tree {
             tree.add_entry(&parents[1..], entry)?;
         }
         Ok(())
+    }
+
+    pub fn entries(&self) -> &BTreeMap<String, TreeEntry> {
+        &self.entries
     }
 }

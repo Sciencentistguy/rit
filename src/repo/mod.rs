@@ -1,6 +1,6 @@
 mod add;
 mod commit;
-mod database;
+pub mod database;
 mod refs;
 mod status;
 mod workspace;
