@@ -22,6 +22,10 @@ pub enum Command {
     CatFile(CatFile),
 
     Status,
+
+    ShowHead {
+        oid: Option<Digest>,
+    },
 }
 
 // FIXME: This is exposing the full names of the subcommands.

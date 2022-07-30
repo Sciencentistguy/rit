@@ -136,7 +136,7 @@ pub enum LoadedItem {
 }
 
 impl LoadedItem {
-    pub fn as_commit(&self) -> Option<&Commit> {
+    pub fn into_commit(self) -> Option<Commit> {
         if let Self::Commit(v) = self {
             Some(v)
         } else {
@@ -144,8 +144,56 @@ impl LoadedItem {
         }
     }
 
+    pub fn into_tree(self) -> Option<Tree> {
+        if let Self::Tree(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn into_blob(self) -> Option<Blob> {
+        if let Self::Blob(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    /// Returns `true` if the loaded item is [`Tree`].
+    ///
+    /// [`Tree`]: LoadedItem::Tree
+    #[must_use]
+    pub fn is_tree(&self) -> bool {
+        matches!(self, Self::Tree(..))
+    }
+
+    /// Returns `true` if the loaded item is [`Commit`].
+    ///
+    /// [`Commit`]: LoadedItem::Commit
+    #[must_use]
+    pub fn is_commit(&self) -> bool {
+        matches!(self, Self::Commit(..))
+    }
+
+    /// Returns `true` if the loaded item is [`Blob`].
+    ///
+    /// [`Blob`]: LoadedItem::Blob
+    #[must_use]
+    pub fn is_blob(&self) -> bool {
+        matches!(self, Self::Blob(..))
+    }
+
     pub fn as_tree(&self) -> Option<&Tree> {
         if let Self::Tree(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_commit(&self) -> Option<&Commit> {
+        if let Self::Commit(v) = self {
             Some(v)
         } else {
             None

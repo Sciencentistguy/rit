@@ -74,6 +74,8 @@ fn main() -> Result<()> {
         Command::CatFile(args) => cat_file::handle(&mut repo, args)?,
 
         Command::Status => repo.status()?,
+
+        Command::ShowHead { oid } => repo.show_head(oid.clone())?,
     }
 
     Ok(())

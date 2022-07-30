@@ -30,10 +30,11 @@ impl super::TreeEntry {
     /// Parses an entry from the tree. Lines are of the form
     /// `<mode> <name>\0<oid>`
     fn parse(line: &[u8]) -> Result<(String, Self)> {
-        const MODE_LEN: usize = 6;
+        // const MODE_LEN: usize = 6;
+        let mode_len = line.iter().position(|&b| b == b' ').unwrap();
 
-        let (mode, line) = line.split_at(MODE_LEN);
-        let mode = str::from_utf8(mode)?;
+        let (mode, line) = line.split_at(mode_len);
+        let mode = str::from_utf8(mode)?.trim();
         let mode = FileMode(u32::from_str_radix(mode, 8)?);
 
         let line = &line[1..];
@@ -52,8 +53,6 @@ impl super::TreeEntry {
         let (_, oid) = line.split_at(name.len() + 1 /* for null byte*/);
 
         let oid = Digest(oid.try_into().unwrap());
-
-        println!("{name} oid: {:?}", oid);
 
         Ok((name.clone(), Self::Database { oid, name, mode }))
     }
