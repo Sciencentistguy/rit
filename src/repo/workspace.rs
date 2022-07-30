@@ -1,14 +1,15 @@
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::os::unix::prelude::OsStrExt;
-use std::path::{Path, PathBuf};
 
+use camino::{Utf8Path, Utf8PathBuf};
+use color_eyre::eyre::eyre;
 use walkdir::WalkDir;
 
 use crate::*;
 
 impl super::Repo {
-    pub fn list_files(&self, path: &Path) -> Result<Vec<PathBuf>> {
+    pub fn list_files(&self, path: &Utf8Path) -> Result<Vec<Utf8PathBuf>> {
         let path = self.dir.join(path);
         if path.is_file() {
             Ok(vec![path])
@@ -18,9 +19,15 @@ impl super::Repo {
             for entry in WalkDir::new(path) {
                 let entry = entry?;
                 let path = entry.path();
+                let path = Utf8Path::from_path(path).ok_or_else(|| {
+                    eyre!(
+                        "All paths must be valid unicode: found '{:?}'",
+                        path.display()
+                    )
+                })?;
                 if path
                     .components()
-                    .any(|c| AsRef::<Path>::as_ref(&c) == Path::new(".git"))
+                    .any(|c| AsRef::<Utf8Path>::as_ref(&c) == Utf8Path::new(".git"))
                 {
                     continue;
                 }
@@ -33,7 +40,7 @@ impl super::Repo {
         }
     }
 
-    pub fn stat_file(path: &Path) -> libc::stat {
+    pub fn stat_file(path: &Utf8Path) -> libc::stat {
         // Safety: Calls libc::stat. Stat doesn't read from its second argument, so this is sound
         unsafe {
             let mut dest: MaybeUninit<libc::stat> = MaybeUninit::uninit();

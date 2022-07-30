@@ -12,6 +12,7 @@ use sha1::{Digest as _, Sha1};
 pub struct Digest(pub [u8; 20]);
 
 impl Digest {
+    /// Hash the input bytes and return the resulting digest.
     pub fn new(bytes: &[u8]) -> Self {
         let mut hasher = Sha1::new();
         hasher.update(&bytes);
@@ -26,6 +27,9 @@ impl Digest {
         }
     }
 
+    /// Format the digest as a hex string.
+    ///
+    /// Identical to `format!("{:x}", self)`.
     pub fn to_hex(&self) -> String {
         hex::encode(self.0)
     }

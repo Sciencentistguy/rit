@@ -5,6 +5,7 @@ use crate::repo::Repo;
 use crate::Result;
 
 pub fn handle(repo: &mut Repo, args: &CatFile) -> Result<()> {
+    #[allow(unused_variables)]
     match args {
         CatFile::Exists { object } => {
             if repo.database.exists(object) {

@@ -1,4 +1,4 @@
-use std::path::Path;
+use camino::Utf8Path;
 
 use rand::prelude::*;
 
@@ -24,11 +24,11 @@ pub fn tmp_file_name() -> String {
 }
 
 pub trait Descends {
-    fn descends(&self) -> Vec<&Path>;
+    fn descends(&self) -> Vec<&Utf8Path>;
 }
 
-impl Descends for Path {
-    fn descends(&self) -> Vec<&Path> {
+impl Descends for Utf8Path {
+    fn descends(&self) -> Vec<&Utf8Path> {
         let mut descends: Vec<_> = self.ancestors().collect();
         let _ = descends.pop();
         descends.reverse();

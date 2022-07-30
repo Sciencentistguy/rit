@@ -5,9 +5,9 @@ use crate::*;
 use std::fs::Permissions;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
 use std::process::{Command, Stdio};
 
+use camino::Utf8Path;
 use pretty_assertions::assert_eq;
 use tempdir::TempDir;
 
@@ -18,7 +18,7 @@ use tempdir::TempDir;
 /// The generated Trees and Blobs should be identical. The commit itself will not be identical due
 /// to differing timestamps, but the *text* of the commit should be.
 fn commit() -> Result<()> {
-    fn write_test_files(path: &Path) -> io::Result<()> {
+    fn write_test_files(path: &Utf8Path) -> io::Result<()> {
         // Test files:
         // - file1: a normal file, chmod 644 (should be stored as REGULAR)
         // - file2: a normal file, chmod 755 (should be stored as EXECUTABLE)
@@ -30,8 +30,10 @@ fn commit() -> Result<()> {
     }
     let dir_rit = TempDir::new("")?;
     let dir_rit = dir_rit.path();
+    let dir_rit = Utf8Path::from_path(dir_rit).unwrap();
     let dir_git = TempDir::new("")?;
     let dir_git = dir_git.path();
+    let dir_git = Utf8Path::from_path(dir_git).unwrap();
 
     std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
     std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
@@ -45,9 +47,9 @@ fn commit() -> Result<()> {
         "commit.gpgsign=false",
     ];
 
-    Repo::init(dir_rit)?;
+    Repo::init(&dir_rit)?;
     let mut rit_repo = Repo::open(dir_rit.to_owned())?;
-    write_test_files(dir_rit)?;
+    write_test_files(&dir_rit)?;
     rit_repo.add(&[".".into()])?;
     let commit_id = rit_repo.commit("test")?;
 
@@ -59,7 +61,7 @@ fn commit() -> Result<()> {
         .status()
         .unwrap();
 
-    write_test_files(dir_git)?;
+    write_test_files(&dir_git)?;
 
     Command::new("git")
         .args(&git_command_args)
@@ -78,8 +80,8 @@ fn commit() -> Result<()> {
         .status()?;
 
     let rit_dir = dir_rit.join(".git");
-    let file1_path = Path::new("objects/86/f8ad067d20fa9b45f673d8e39f0bd9696664cb");
-    let tree_path = Path::new("objects/b1/241e4ad46f3749d7c7962c122c5343dc2b90e4");
+    let file1_path = Utf8Path::new("objects/86/f8ad067d20fa9b45f673d8e39f0bd9696664cb");
+    let tree_path = Utf8Path::new("objects/b1/241e4ad46f3749d7c7962c122c5343dc2b90e4");
     assert!(rit_dir.join(file1_path).exists());
 
     let git_dir = dir_git.join(".git");
@@ -141,8 +143,10 @@ fn commit() -> Result<()> {
 pub(super) fn commit_file_hierarchy() -> Result<()> {
     let dir_rit = TempDir::new("")?;
     let dir_rit = dir_rit.path();
+    let dir_rit = Utf8Path::from_path(dir_rit).unwrap();
     let dir_git = TempDir::new("")?;
     let dir_git = dir_git.path();
+    let dir_git = Utf8Path::from_path(dir_git).unwrap();
 
     std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
     std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
@@ -192,10 +196,10 @@ pub(super) fn commit_file_hierarchy() -> Result<()> {
         .status()?;
 
     let rit_dir = dir_rit.join(".git");
-    let root_tree_path = Path::new("objects/86/fd91b1c8d427d3577466833d9d686e85cd48df");
-    let a_tree_path = Path::new("objects/4b/fb9c1f612da47abcfd8dfaff81dd7466b8f51e");
-    let b_tree_path = Path::new("objects/c3/b2f03652d76b13a2ddb3a5da088ce7b203b3c8");
-    let c_path = Path::new("objects/bf/c88425b0e2f167af3f1cfa9db193edf752b13b");
+    let root_tree_path = Utf8Path::new("objects/86/fd91b1c8d427d3577466833d9d686e85cd48df");
+    let a_tree_path = Utf8Path::new("objects/4b/fb9c1f612da47abcfd8dfaff81dd7466b8f51e");
+    let b_tree_path = Utf8Path::new("objects/c3/b2f03652d76b13a2ddb3a5da088ce7b203b3c8");
+    let c_path = Utf8Path::new("objects/bf/c88425b0e2f167af3f1cfa9db193edf752b13b");
     assert!(rit_dir.join(root_tree_path).exists());
     assert!(rit_dir.join(a_tree_path).exists());
     assert!(rit_dir.join(b_tree_path).exists());

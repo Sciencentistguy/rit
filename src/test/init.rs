@@ -1,14 +1,16 @@
 use crate::*;
 
+use camino::Utf8Path;
 use tempdir::TempDir;
 
 #[test]
 /// Use rit to init a directory as a repo. Check that the correct directories have been created.
 fn rit_init() -> Result<()> {
     let dir = TempDir::new("")?;
-    Repo::init(dir.path())?;
+    let dir = Utf8Path::from_path(dir.as_ref()).unwrap();
+    Repo::init(dir)?;
 
-    let git_dir = dir.as_ref().join(".git");
+    let git_dir = dir.join(".git");
     let obj_dir = git_dir.join("objects");
     let refs_dir = git_dir.join("refs");
 

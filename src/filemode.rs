@@ -23,6 +23,12 @@ impl FileMode {
     pub const EXECUTABLE: FileMode = FileMode(0o100755);
     pub const REGULAR: FileMode = FileMode(0o100644);
 
+    #[cfg(target_os = "macos")]
+    pub fn is_executable(self) -> bool {
+        self.0 & libc::S_IXUSR as u32 != 0
+    }
+
+    #[cfg(target_os = "linux")]
     pub fn is_executable(self) -> bool {
         self.0 & libc::S_IXUSR != 0
     }
@@ -50,6 +56,10 @@ impl DerefMut for FileMode {
 
 impl From<&libc::stat> for FileMode {
     fn from(stat: &libc::stat) -> Self {
+        #[cfg(target_os = "macos")]
+        let actual_mode = FileMode(stat.st_mode as u32);
+
+        #[cfg(target_os = "linux")]
         let actual_mode = FileMode(stat.st_mode);
 
         if actual_mode != FileMode::REGULAR && actual_mode != FileMode::EXECUTABLE {
