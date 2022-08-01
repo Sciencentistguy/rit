@@ -27,9 +27,15 @@ impl super::Repo {
         Ok(())
     }
 
+    /// Checks whether an index entry has been modified.
+    /// Returns `true` if a file has been modified, `false` otherwise.
     fn check_index_entry(&self, entry: &IndexEntry) -> Result<bool> {
         let full_path = self.dir.join(entry.path());
-        let stat = Self::stat_file(&full_path);
+        let stat = match Self::stat_file(&full_path)? {
+            Some(x) => x,
+            None => return Ok(false),
+        };
+
         if !entry.stat_matches(&stat) {
             return Ok(true);
         }
@@ -61,10 +67,7 @@ impl super::Repo {
     ) -> impl ParallelIterator<Item = &'a Utf8Path> + 's {
         index
             .par_iter()
-            .filter(|(_, &entry)| {
-                self.check_index_entry(entry)
-                    .expect("Failed to check index entry")
-            })
+            .filter(|(_, &entry)| self.check_index_entry(entry).unwrap())
             .map(|(p, _)| *p)
     }
 

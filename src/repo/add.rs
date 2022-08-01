@@ -24,7 +24,7 @@ impl super::Repo {
 
                 let data = std::fs::read(&abs_path)
                     .wrap_err(format!("Failed to read file: {}", abs_path))?;
-                let stat = Self::stat_file(&abs_path);
+                let stat = Self::stat_file(&abs_path)?.unwrap();
 
                 let blob = Blob::new(data);
                 let blob = DatabaseObject::new(&blob);

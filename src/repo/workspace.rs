@@ -40,16 +40,26 @@ impl super::Repo {
         }
     }
 
-    pub fn stat_file(path: &Utf8Path) -> libc::stat {
-        // Safety: Calls libc::stat. Stat doesn't read from its second argument, so this is sound
-        unsafe {
-            let mut dest: MaybeUninit<libc::stat> = MaybeUninit::uninit();
-            let path = CString::new(path.as_os_str().as_bytes()).unwrap();
-            let err = libc::stat(path.as_ptr(), dest.as_mut_ptr());
-            if err != 0 {
-                panic!("stat failed with code: {}", err);
+    /// Get the libc::stat information for a file. Returns None if the file does not exist
+    pub fn stat_file(path: &Utf8Path) -> Result<Option<libc::stat>> {
+        if path.exists() {
+            // Safety: Calls libc::stat. Stat doesn't read from its second argument, so this is
+            // sound
+            unsafe {
+                let mut dest: MaybeUninit<libc::stat> = MaybeUninit::uninit();
+                let cpath = CString::new(path.as_os_str().as_bytes()).unwrap();
+                let err = libc::stat(cpath.as_ptr(), dest.as_mut_ptr());
+                match err {
+                    0 => Ok(Some(dest.assume_init())),
+                    -1 => {
+                        let error = std::io::Error::last_os_error();
+                        Err(error).wrap_err_with(|| format!("libc::stat({path}) failed"))
+                    }
+                    _ => unreachable!("libc::stat cannot return other values"),
+                }
             }
-            dest.assume_init()
+        } else {
+            Ok(None)
         }
     }
 }
