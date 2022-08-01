@@ -16,15 +16,4 @@ impl super::Repo {
         writeln!(&mut head, "{oid:x}")?;
         Ok(())
     }
-
-    pub fn read_head(&self) -> Result<Option<Digest>> {
-        if !self.head_path.is_file() {
-            return Ok(None);
-        }
-        let mut oid = Digest::default();
-        let read = std::fs::read_to_string(&self.head_path)?;
-        let x = hex::decode(read.trim().as_bytes()).wrap_err("Invalid value in HEAD")?;
-        oid.0.copy_from_slice(&x);
-        Ok(Some(oid))
-    }
 }

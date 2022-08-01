@@ -30,7 +30,6 @@ impl super::TreeEntry {
     /// Parses an entry from the tree. Lines are of the form
     /// `<mode> <name>\0<oid>`
     fn parse(line: &[u8]) -> Result<(String, Self)> {
-        // const MODE_LEN: usize = 6;
         let mode_len = line.iter().position(|&b| b == b' ').unwrap();
 
         let (mode, line) = line.split_at(mode_len);

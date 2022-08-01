@@ -5,6 +5,7 @@ mod refs;
 mod status;
 mod workspace;
 mod show_head;
+mod head;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
