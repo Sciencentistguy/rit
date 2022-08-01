@@ -13,7 +13,7 @@ impl super::Repo {
         let contents = std::fs::read_to_string(&self.head_path)?;
         let contents = contents.trim();
         if let Some(contents) = contents.strip_prefix("ref: ") {
-            let path = self.dir.join(".git").join(contents);
+            let path = self.git_dir.join(contents);
             dbg!(&path);
             if !path.exists() {
                 Err(eyre!("HEAD points to non-existstant ref: {}", path))

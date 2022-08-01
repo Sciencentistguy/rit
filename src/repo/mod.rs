@@ -1,11 +1,12 @@
 mod add;
 mod commit;
 pub mod database;
+mod head;
+mod ignore;
 mod refs;
+mod show_head;
 mod status;
 mod workspace;
-mod show_head;
-mod head;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
@@ -18,6 +19,7 @@ use self::database::Database;
 
 pub struct Repo {
     pub dir: Utf8PathBuf,
+    pub git_dir: Utf8PathBuf,
     pub head_path: Utf8PathBuf,
     pub database: Database,
     pub index: IndexWrapper,
@@ -39,6 +41,7 @@ impl Repo {
         let head_path = git_dir.join("HEAD");
         Ok(Self {
             dir: repo_root,
+            git_dir,
             head_path,
             database,
             index,

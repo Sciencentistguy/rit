@@ -3,7 +3,7 @@ use std::mem::MaybeUninit;
 use std::os::unix::prelude::OsStrExt;
 
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::eyre::eyre;
+use color_eyre::eyre::{eyre, Context};
 use walkdir::WalkDir;
 
 use crate::*;
@@ -14,9 +14,11 @@ impl super::Repo {
         if path.is_file() {
             Ok(vec![path])
         } else {
+            let ignores = self.ignores();
+
             let mut entries = Vec::new();
 
-            for entry in WalkDir::new(path) {
+            'outer: for entry in WalkDir::new(path) {
                 let entry = entry?;
                 let path = entry.path();
                 let path = Utf8Path::from_path(path).ok_or_else(|| {
@@ -25,12 +27,13 @@ impl super::Repo {
                         path.display()
                     )
                 })?;
-                if path
-                    .components()
-                    .any(|c| AsRef::<Utf8Path>::as_ref(&c) == Utf8Path::new(".git"))
-                {
-                    continue;
+
+                for ignore in ignores {
+                    if path.as_str().contains(ignore) {
+                        continue 'outer;
+                    }
                 }
+
                 if path.is_dir() && !path.is_symlink() {
                     continue;
                 }
