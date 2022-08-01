@@ -218,7 +218,6 @@ mod tests {
     use crate::{
         repo::Repo,
         test::{COMMIT_EMAIL, COMMIT_NAME},
-        tree::TreeEntry,
     };
 
     use super::*;

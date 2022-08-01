@@ -47,9 +47,9 @@ fn commit() -> Result<()> {
         "commit.gpgsign=false",
     ];
 
-    Repo::init(&dir_rit)?;
+    Repo::init(dir_rit)?;
     let mut rit_repo = Repo::open(dir_rit.to_owned())?;
-    write_test_files(&dir_rit)?;
+    write_test_files(dir_rit)?;
     rit_repo.add(&[".".into()])?;
     let commit_id = rit_repo.commit("test")?;
 
@@ -61,7 +61,7 @@ fn commit() -> Result<()> {
         .status()
         .unwrap();
 
-    write_test_files(&dir_git)?;
+    write_test_files(dir_git)?;
 
     Command::new("git")
         .args(&git_command_args)
