@@ -18,7 +18,7 @@ use flate2::Compression;
 use tracing::*;
 
 pub struct Database {
-    database_root: Utf8PathBuf,
+    pub database_root: Utf8PathBuf,
 }
 
 impl Database {
@@ -100,8 +100,8 @@ impl Database {
     pub fn load(&self, oid: &Digest) -> Result<LoadedItem> {
         let mut bytes = self.read_to_vec(oid)?;
 
-        let space_idx = bytes.iter().position(|&b| b == b' ').unwrap();
-        let nul_idx = bytes.iter().position(|&b| b == b'\0').unwrap();
+        let space_idx = memchr::memchr(b' ', &bytes).unwrap();
+        let nul_idx = memchr::memchr(b'\0', &bytes).unwrap();
         let r#type = &bytes[..space_idx];
         debug_assert!({
             let len = &bytes[space_idx + 1..nul_idx];
@@ -118,7 +118,8 @@ impl Database {
             }
             b"tree" => {
                 let bytes = &bytes[content_start..];
-                Ok(LoadedItem::Tree(Tree::parse(bytes)?))
+                let root = self.database_root.parent().unwrap().parent().unwrap();
+                Ok(LoadedItem::Tree(Tree::parse(bytes, root, self)?))
             }
             b"commit" => {
                 let bytes = &bytes[content_start..];

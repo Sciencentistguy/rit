@@ -63,7 +63,7 @@ impl From<&libc::stat> for FileMode {
         let actual_mode = FileMode(stat.st_mode);
 
         if actual_mode != FileMode::REGULAR && actual_mode != FileMode::EXECUTABLE {
-            warn!( 
+            warn!(
                 mode=?actual_mode,
                 "Discarding information! Storing file with unsupported mode"
             );

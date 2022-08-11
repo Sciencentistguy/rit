@@ -13,11 +13,14 @@ use crate::{filemode::FileMode, index::IndexEntry, Digest};
 #[derive(Debug)]
 pub enum TreeEntry {
     File(IndexEntry),
-    Directory(Tree),
-    Database {
+    IncompleteFile {
         oid: Digest,
         name: String,
         mode: FileMode,
+    },
+    Directory {
+        tree: Tree,
+        name: String,
     },
 }
 
@@ -25,20 +28,16 @@ impl TreeEntry {
     fn mode(&self) -> FileMode {
         match self {
             TreeEntry::File(f) => f.mode(),
-            TreeEntry::Directory(_) => FileMode::DIRECTORY,
-            TreeEntry::Database {
-                oid: _,
-                name: _,
-                mode,
-            } => *mode,
+            TreeEntry::Directory { .. } => FileMode::DIRECTORY,
+            TreeEntry::IncompleteFile { mode, .. } => *mode,
         }
     }
 
     pub fn oid(&self) -> Option<&Digest> {
         match self {
             TreeEntry::File(f) => Some(f.oid()),
-            TreeEntry::Directory(t) => t.oid.get(),
-            TreeEntry::Database { oid, .. } => Some(oid),
+            TreeEntry::Directory { tree, .. } => tree.oid.get(),
+            TreeEntry::IncompleteFile { oid, .. } => Some(oid),
         }
     }
 }
@@ -75,7 +74,7 @@ impl Tree {
         F: Fn(&Self) -> Result<()> + Copy,
     {
         for (name, entry) in self.entries.iter() {
-            if let TreeEntry::Directory(entry) = entry {
+            if let TreeEntry::Directory { tree: entry, .. } = entry {
                 trace!(%name, "Traversing subtree");
                 entry.traverse(f)?;
             }
@@ -93,17 +92,16 @@ impl Tree {
                 .insert(filename.to_owned(), TreeEntry::File(entry.clone()));
         } else {
             let tree = Tree::new();
+            let name = parents[0]
+                .file_name()
+                .expect("Entry should have a file name")
+                .to_owned();
             let tree = self
                 .entries
-                .entry(
-                    parents[0]
-                        .file_name()
-                        .expect("Entry should have a file name")
-                        .to_owned(),
-                )
-                .or_insert(TreeEntry::Directory(tree));
+                .entry(name.clone())
+                .or_insert(TreeEntry::Directory { tree, name });
             let tree = match tree {
-                TreeEntry::Directory(tree) => tree,
+                TreeEntry::Directory { tree, .. } => tree,
                 _ => unreachable!("entry should be a tree"),
             };
 
@@ -115,5 +113,27 @@ impl Tree {
 
     pub fn entries(&self) -> &BTreeMap<String, TreeEntry> {
         &self.entries
+    }
+
+    pub fn contains(&self, name: &str) -> bool {
+        if self.entries.contains_key(name) {
+            return true;
+        }
+        for entry in self.entries.values() {
+            if let TreeEntry::Directory { tree, .. } = entry {
+                let name = Utf8Path::new(name);
+                let name = name.file_name().unwrap();
+                if tree.contains(name) {
+                    return true;
+                }
+            }
+        }
+
+        false
+        // todo!("this is wrong")
+    }
+
+    pub fn oid(&self) -> Option<&Digest> {
+        self.oid.get()
     }
 }
