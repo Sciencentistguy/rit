@@ -44,17 +44,24 @@ impl super::Repo {
     fn show_tree(&self, tree: &Tree, prefix: &Utf8Path) -> Result<()> {
         for entry in tree.entries().values() {
             let (oid, name, mode) = match entry {
-                crate::tree::TreeEntry::Database { oid, name, mode } => (oid, name, mode),
-                _ => unreachable!(),
+                crate::tree::TreeEntry::File(file) => (file.oid(), file.name(), file.mode()),
+                crate::tree::TreeEntry::IncompleteFile { oid, name, mode } => {
+                    (oid, name.as_str(), *mode)
+                }
+                crate::tree::TreeEntry::Directory { tree, name } => {
+                    let prefix = Utf8Path::new(&name);
+                    self.show_tree(tree, prefix)?;
+                    continue;
+                }
             };
 
-            let object = self.database.load(oid)?;
-            if let Some(tree) = object.as_tree() {
-                let prefix = Utf8Path::new(name);
-                self.show_tree(tree, prefix)?;
-            } else {
-                println!("{:o} {:x} {}", mode, oid, prefix.join(name));
-            }
+            println!("{:o} {:x} {}", mode, oid, prefix.join(name));
+
+            // let object = self.database.load(oid)?;
+            // if let Some(tree) = object.as_tree() {
+            // unreachable!()
+            // } else {
+            // }
         }
 
         Ok(())

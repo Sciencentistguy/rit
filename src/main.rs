@@ -69,7 +69,13 @@ fn main() -> Result<()> {
             println!("Created commit {}", commit_id.to_hex())
         }
 
-        Command::Add { path } => repo.add(path)?,
+        Command::Add { paths } => {
+            if paths.is_empty() {
+                repo.add_all()?
+            } else {
+                repo.add(paths)?
+            }
+        }
 
         Command::CatFile(args) => cat_file::handle(&mut repo, args)?,
 

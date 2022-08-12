@@ -24,7 +24,7 @@ impl super::Repo {
 
                 let data = std::fs::read(&abs_path)
                     .wrap_err(format!("Failed to read file: {}", abs_path))?;
-                let stat = Self::stat_file(&abs_path);
+                let stat = Self::stat_file(&abs_path)?.unwrap();
 
                 let blob = Blob::new(data);
                 let blob = DatabaseObject::new(&blob);
@@ -35,5 +35,9 @@ impl super::Repo {
         self.index.write_out()?;
 
         Ok(())
+    }
+
+    pub fn add_all(&mut self) -> Result<()> {
+        self.add(&[".".into()])
     }
 }

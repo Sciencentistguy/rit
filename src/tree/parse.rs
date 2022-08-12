@@ -1,21 +1,29 @@
 use std::{collections::BTreeMap, ffi::CStr, str};
 
-use crate::{digest::Digest, filemode::FileMode, Result};
+use crate::{
+    digest::Digest,
+    filemode::FileMode,
+    index::IndexEntry,
+    repo::{database::Database, Repo},
+    tree::Tree,
+    Result,
+};
 
 use super::TreeEntry;
 
+use camino::Utf8Path;
 use color_eyre::eyre::{eyre, Context};
 use once_cell::sync::OnceCell;
 
 impl super::Tree {
-    pub fn parse(mut bytes: &[u8]) -> Result<Self> {
+    pub fn parse(mut bytes: &[u8], root: &Utf8Path, database: &Database) -> Result<Self> {
         let mut entries: BTreeMap<String, TreeEntry> = Default::default();
 
         while let Some(null_idx) = bytes.iter().position(|&c| c == b'\0') {
             let line = &bytes[..null_idx + 21];
             bytes = &bytes[null_idx + 21..];
 
-            let (name, entry) = TreeEntry::parse(line)?;
+            let (name, entry) = TreeEntry::parse(line, root, database)?;
             entries.insert(name, entry);
         }
 
@@ -29,8 +37,7 @@ impl super::Tree {
 impl super::TreeEntry {
     /// Parses an entry from the tree. Lines are of the form
     /// `<mode> <name>\0<oid>`
-    fn parse(line: &[u8]) -> Result<(String, Self)> {
-        // const MODE_LEN: usize = 6;
+    fn parse(line: &[u8], prefix: &Utf8Path, database: &Database) -> Result<(String, Self)> {
         let mode_len = line.iter().position(|&b| b == b' ').unwrap();
 
         let (mode, line) = line.split_at(mode_len);
@@ -54,6 +61,29 @@ impl super::TreeEntry {
 
         let oid = Digest(oid.try_into().unwrap());
 
-        Ok((name.clone(), Self::Database { oid, name, mode }))
+        // let path = Utf8Path::new(&name);
+        let path = prefix.join(&name);
+
+        if path.is_dir() {
+            let bytes = database.read_to_vec(&oid)?;
+            let nul_idx = memchr::memchr(b'\0', &bytes).unwrap();
+            let bytes = &bytes[nul_idx + 1..];
+            let subtree = Tree::parse(bytes, &prefix.join(&name), database)?;
+            Ok((
+                name.clone(),
+                TreeEntry::Directory {
+                    tree: subtree,
+                    name,
+                },
+            ))
+        } else if path.exists() {
+            let stat = Repo::stat_file(&path)?.expect("File should exist");
+            Ok((
+                name.clone(),
+                Self::File(IndexEntry::new(Utf8Path::new(&name), &oid, stat)?),
+            ))
+        } else {
+            Ok((name.clone(), Self::IncompleteFile { oid, name, mode }))
+        }
     }
 }

@@ -82,7 +82,7 @@ impl PartialOrd for IndexEntry {
 impl IndexEntry {
     const MAX_PATH_SIZE: u16 = 0xfff;
 
-    fn create(path: &Utf8Path, oid: &Digest, stat: libc::stat) -> Result<Self> {
+    pub fn new(path: &Utf8Path, oid: &Digest, stat: libc::stat) -> Result<Self> {
         let name = path.as_str().to_owned();
 
         let flags = path
@@ -178,7 +178,7 @@ impl IndexWrapper {
 
     pub fn add(&mut self, path: &Utf8Path, oid: &Digest, stat: libc::stat) {
         trace!(?path, "Adding entry to index");
-        let entry = IndexEntry::create(path, oid, stat).unwrap();
+        let entry = IndexEntry::new(path, oid, stat).unwrap();
 
         self.discard_conflicts(&entry);
         self.entries.push(entry);
@@ -290,7 +290,7 @@ mod tests {
 
         Repo::init(dir)?;
         let mut rit_repo = Repo::open(dir.to_owned())?;
-        rit_repo.add(&[".".into()])?;
+        rit_repo.add_all()?;
         let rit_index = std::fs::read(dir.join(".git/index"))?;
 
         std::fs::remove_dir_all(dir.join(".git"))?;

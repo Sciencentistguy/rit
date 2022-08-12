@@ -28,11 +28,7 @@ impl Timestamp {
         format!(
             "{} {}{:04}",
             self.unix,
-            if self.offset.is_negative() {
-                '-'
-            } else {
-                '+'
-            },
+            if self.offset.is_negative() { '-' } else { '+' },
             self.offset.abs()
         )
     }
@@ -44,7 +40,6 @@ struct Signature {
     email: String,
     when: Timestamp,
 }
-
 
 pub struct Commit {
     tree_id: Digest,

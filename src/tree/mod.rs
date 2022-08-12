@@ -8,37 +8,44 @@ use color_eyre::Result;
 use once_cell::sync::OnceCell;
 use tracing::*;
 
-use crate::{filemode::FileMode, index::IndexEntry, Digest};
+use crate::{filemode::FileMode, index::IndexEntry, util::Descends, Digest};
 
 #[derive(Debug)]
 pub enum TreeEntry {
     File(IndexEntry),
-    Directory(Tree),
-    Database {
+    IncompleteFile {
         oid: Digest,
         name: String,
         mode: FileMode,
     },
+    Directory {
+        tree: Tree,
+        name: String,
+    },
 }
 
 impl TreeEntry {
-    fn mode(&self) -> FileMode {
+    pub fn mode(&self) -> FileMode {
         match self {
             TreeEntry::File(f) => f.mode(),
-            TreeEntry::Directory(_) => FileMode::DIRECTORY,
-            TreeEntry::Database {
-                oid: _,
-                name: _,
-                mode,
-            } => *mode,
+            TreeEntry::Directory { .. } => FileMode::DIRECTORY,
+            TreeEntry::IncompleteFile { mode, .. } => *mode,
         }
     }
 
     pub fn oid(&self) -> Option<&Digest> {
         match self {
             TreeEntry::File(f) => Some(f.oid()),
-            TreeEntry::Directory(t) => t.oid.get(),
-            TreeEntry::Database { oid, .. } => Some(oid),
+            TreeEntry::Directory { tree, .. } => tree.oid.get(),
+            TreeEntry::IncompleteFile { oid, .. } => Some(oid),
+        }
+    }
+
+    pub fn as_file(&self) -> Option<&IndexEntry> {
+        if let Self::File(v) = self {
+            Some(v)
+        } else {
+            None
         }
     }
 }
@@ -75,7 +82,7 @@ impl Tree {
         F: Fn(&Self) -> Result<()> + Copy,
     {
         for (name, entry) in self.entries.iter() {
-            if let TreeEntry::Directory(entry) = entry {
+            if let TreeEntry::Directory { tree: entry, .. } = entry {
                 trace!(%name, "Traversing subtree");
                 entry.traverse(f)?;
             }
@@ -93,17 +100,16 @@ impl Tree {
                 .insert(filename.to_owned(), TreeEntry::File(entry.clone()));
         } else {
             let tree = Tree::new();
+            let name = parents[0]
+                .file_name()
+                .expect("Entry should have a file name")
+                .to_owned();
             let tree = self
                 .entries
-                .entry(
-                    parents[0]
-                        .file_name()
-                        .expect("Entry should have a file name")
-                        .to_owned(),
-                )
-                .or_insert(TreeEntry::Directory(tree));
+                .entry(name.clone())
+                .or_insert(TreeEntry::Directory { tree, name });
             let tree = match tree {
-                TreeEntry::Directory(tree) => tree,
+                TreeEntry::Directory { tree, .. } => tree,
                 _ => unreachable!("entry should be a tree"),
             };
 
@@ -115,5 +121,97 @@ impl Tree {
 
     pub fn entries(&self) -> &BTreeMap<String, TreeEntry> {
         &self.entries
+    }
+
+    pub fn contains(&self, name: impl AsRef<str>) -> bool {
+        let name = name.as_ref();
+        if self.entries.contains_key(name) {
+            return true;
+        }
+        for entry in self.entries.values() {
+            if let TreeEntry::Directory { tree, .. } = entry {
+                let name = Utf8Path::new(name);
+                let name = name.file_name().unwrap();
+                if tree.contains(name) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    pub fn get_entry(&self, name: &str) -> Option<&IndexEntry> {
+        let path = Utf8Path::new(name);
+        if let Some(entry) = self.entries.get(name) {
+            if let TreeEntry::File(entry) = entry {
+                Some(entry)
+            } else {
+                None
+            }
+        } else {
+            let top_of_path = path.descends()[0];
+            if let Some(TreeEntry::Directory { tree, .. }) = self.entries.get(top_of_path.as_str())
+            {
+                let rest = path.strip_prefix(top_of_path).unwrap();
+                tree.get_entry(rest.as_str())
+            } else {
+                None
+            }
+        }
+    }
+
+    pub fn oid(&self) -> Option<&Digest> {
+        self.oid.get()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &TreeEntry> + '_ {
+        struct Iter<'a> {
+            tree: &'a Tree,
+            stack: Vec<Box<dyn Iterator<Item = &'a TreeEntry> + 'a>>,
+        }
+
+        impl<'a> Iter<'a> {
+            fn new(tree: &'a Tree) -> Self {
+                let it = tree.entries.iter().map(|x| x.1);
+                Self {
+                    tree,
+                    stack: vec![Box::new(it)],
+                }
+            }
+        }
+
+        impl<'a> Iterator for Iter<'a> {
+            type Item = &'a TreeEntry;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                if let Some(x) = self.stack.first_mut() {
+                    let next = x.next();
+                    match next {
+                        Some(ent @ TreeEntry::File(_)) => Some(ent),
+
+                        Some(ent @ TreeEntry::IncompleteFile { .. }) => Some(ent),
+
+                        Some(TreeEntry::Directory { tree, .. }) => {
+                            let it = tree.entries.iter().map(|x| x.1);
+                            self.stack.push(Box::new(it));
+                            self.next()
+                        }
+
+                        None => {
+                            let _ = self.stack.pop();
+                            if self.stack.is_empty() {
+                                return None;
+                            }
+                            self.next()
+                        }
+                    }
+                } else {
+                    unreachable!();
+                }
+            }
+        }
+
+        Iter::new(self)
     }
 }

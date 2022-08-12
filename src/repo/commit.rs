@@ -1,10 +1,10 @@
 use tracing::trace;
 
 use crate::commit::Commit;
-use crate::Result;
 use crate::digest::Digest;
 use crate::storable::DatabaseObject;
 use crate::tree::Tree;
+use crate::Result;
 
 impl super::Repo {
     pub fn commit(&mut self, message: &str) -> Result<Digest> {
