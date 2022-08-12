@@ -24,7 +24,7 @@ macro_rules! create_test_files {
         $({
             let path = $root.join($path);
             std::fs::create_dir_all(path.parent().unwrap())?;
-            write!(std::fs::File::create($root.join($path))?, crate::test_file_contents!($path))?;
+            write!(std::fs::File::create($root.join($path))?, $crate::test_file_contents!($path))?;
         })*
     }};
 }

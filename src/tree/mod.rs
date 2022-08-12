@@ -40,6 +40,14 @@ impl TreeEntry {
             TreeEntry::IncompleteFile { oid, .. } => Some(oid),
         }
     }
+
+    pub fn as_file(&self) -> Option<&IndexEntry> {
+        if let Self::File(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -154,5 +162,55 @@ impl Tree {
 
     pub fn oid(&self) -> Option<&Digest> {
         self.oid.get()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &TreeEntry> + '_ {
+        struct Iter<'a> {
+            tree: &'a Tree,
+            stack: Vec<Box<dyn Iterator<Item = &'a TreeEntry> + 'a>>,
+        }
+
+        impl<'a> Iter<'a> {
+            fn new(tree: &'a Tree) -> Self {
+                let it = tree.entries.iter().map(|x| x.1);
+                Self {
+                    tree,
+                    stack: vec![Box::new(it)],
+                }
+            }
+        }
+
+        impl<'a> Iterator for Iter<'a> {
+            type Item = &'a TreeEntry;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                if let Some(x) = self.stack.first_mut() {
+                    let next = x.next();
+                    match next {
+                        Some(ent @ TreeEntry::File(_)) => Some(ent),
+
+                        Some(ent @ TreeEntry::IncompleteFile { .. }) => Some(ent),
+
+                        Some(TreeEntry::Directory { tree, .. }) => {
+                            let it = tree.entries.iter().map(|x| x.1);
+                            self.stack.push(Box::new(it));
+                            self.next()
+                        }
+
+                        None => {
+                            let _ = self.stack.pop();
+                            if self.stack.is_empty() {
+                                return None;
+                            }
+                            self.next()
+                        }
+                    }
+                } else {
+                    unreachable!();
+                }
+            }
+        }
+
+        Iter::new(self)
     }
 }

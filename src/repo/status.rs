@@ -1,8 +1,8 @@
-use crate::blob::Blob;
 use crate::index::IndexEntry;
 use crate::storable::DatabaseObject;
 use crate::tree::Tree;
 use crate::Result;
+use crate::{blob::Blob, tree::TreeEntry};
 
 use std::{collections::HashMap, fmt::Display};
 
@@ -103,6 +103,7 @@ impl<'r: 'i, 'i> Status<'r, 'i> {
         }
     }
 
+    #[allow(clippy::blocks_in_if_conditions)]
     pub fn get_statuses(&self) -> Result<Vec<(&Utf8Path, Change)>> {
         let untracked = self.files.par_iter().filter_map(|path| {
             if !self.index.contains_key(&path.as_path()) {
@@ -129,7 +130,24 @@ impl<'r: 'i, 'i> Status<'r, 'i> {
             }
         });
 
-        Ok(untracked.chain(mod_rem_add).collect())
+        let del = self.head_tree.iter().filter_map(|entry| {
+            let path = Utf8Path::new(match entry {
+                TreeEntry::File(f) => f.name(),
+                TreeEntry::IncompleteFile { name, .. } => name,
+                TreeEntry::Directory { name, .. } => name,
+            });
+
+            if !self.index.contains_key(path) {
+                Some((path, Change::IndexRemoved))
+            } else {
+                None
+            }
+        });
+
+        Ok(untracked
+            .chain(mod_rem_add)
+            .collect::<Vec<_>>()
+            .tap_mut(|v| v.extend(del)))
     }
 
     /// Checks whether an index entry has been modified.

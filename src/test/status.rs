@@ -3,7 +3,6 @@ use std::os::unix::prelude::PermissionsExt;
 
 use camino::Utf8Path;
 use rand::prelude::*;
-use rayon::prelude::*;
 use tempdir::TempDir;
 
 use crate::{
