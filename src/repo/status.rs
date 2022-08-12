@@ -119,6 +119,11 @@ impl<'r: 'i, 'i> Status<'r, 'i> {
                 Some((path, Change::Removed))
             } else if !self.head_tree.contains(entry.name()) {
                 Some((path, Change::IndexAdded))
+            } else if {
+                let tree_entry = self.head_tree.get_entry(entry.name()).unwrap();
+                tree_entry.oid() != entry.oid() || tree_entry.mode() != entry.mode()
+            } {
+                Some((path, Change::IndexModified))
             } else {
                 None
             }

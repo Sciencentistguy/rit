@@ -8,7 +8,7 @@ use color_eyre::Result;
 use once_cell::sync::OnceCell;
 use tracing::*;
 
-use crate::{filemode::FileMode, index::IndexEntry, Digest};
+use crate::{filemode::FileMode, index::IndexEntry, util::Descends, Digest};
 
 #[derive(Debug)]
 pub enum TreeEntry {
@@ -25,7 +25,7 @@ pub enum TreeEntry {
 }
 
 impl TreeEntry {
-    fn mode(&self) -> FileMode {
+    pub fn mode(&self) -> FileMode {
         match self {
             TreeEntry::File(f) => f.mode(),
             TreeEntry::Directory { .. } => FileMode::DIRECTORY,
@@ -130,7 +130,26 @@ impl Tree {
         }
 
         false
-        // todo!("this is wrong")
+    }
+
+    pub fn get_entry(&self, name: &str) -> Option<&IndexEntry> {
+        let path = Utf8Path::new(name);
+        if let Some(entry) = self.entries.get(name) {
+            if let TreeEntry::File(entry) = entry {
+                Some(entry)
+            } else {
+                None
+            }
+        } else {
+            let top_of_path = path.descends()[0];
+            if let Some(TreeEntry::Directory { tree, .. }) = self.entries.get(top_of_path.as_str())
+            {
+                let rest = path.strip_prefix(top_of_path).unwrap();
+                tree.get_entry(rest.as_str())
+            } else {
+                None
+            }
+        }
     }
 
     pub fn oid(&self) -> Option<&Digest> {
