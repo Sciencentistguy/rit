@@ -7,7 +7,10 @@ use rayon::prelude::*;
 use tempdir::TempDir;
 
 use crate::{
-    repo::Repo,
+    repo::{
+        status::{Change, Status},
+        Repo,
+    },
     test::{COMMIT_EMAIL, COMMIT_NAME},
     Result,
 };
@@ -35,15 +38,21 @@ fn test_untracked() -> Result<()> {
     let repo = init_repo(dir)?;
 
     {
-        let (files, index) = repo.get_files_and_index()?;
-        assert_eq!(repo.untracked_files(&files, &index).count(), 0);
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 0);
     }
 
     crate::create_test_files!(dir, ["file5", "file6", "file7", "file8"]);
 
     {
-        let (files, index) = repo.get_files_and_index()?;
-        assert_eq!(repo.untracked_files(&files, &index).count(), 4);
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 4);
+
+        for (_, change) in files {
+            assert_eq!(change, Change::Untracked);
+        }
     }
 
     Ok(())
@@ -58,8 +67,9 @@ fn test_change_file_contents() -> Result<()> {
     let repo = init_repo(dir)?;
 
     {
-        let (_, index) = repo.get_files_and_index()?;
-        assert_eq!(repo.changed_files(&index).count(), 0);
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 0);
     }
 
     write!(
@@ -70,8 +80,13 @@ fn test_change_file_contents() -> Result<()> {
     )?;
 
     {
-        let (_, index) = repo.get_files_and_index()?;
-        assert_eq!(repo.changed_files(&index).count(), 1);
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 1);
+
+        for (_, change) in files {
+            assert_eq!(change, Change::Modified);
+        }
     }
 
     Ok(())
@@ -86,8 +101,9 @@ fn test_change_file_mode() -> Result<()> {
     let repo = init_repo(dir)?;
 
     {
-        let (_, index) = repo.get_files_and_index()?;
-        assert_eq!(repo.changed_files(&index).count(), 0);
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 0);
     }
 
     {
@@ -96,8 +112,13 @@ fn test_change_file_mode() -> Result<()> {
     }
 
     {
-        let (_, index) = repo.get_files_and_index()?;
-        assert_eq!(repo.changed_files(&index).count(), 1);
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 1);
+
+        for (_, change) in files {
+            assert_eq!(change, Change::Modified);
+        }
     }
 
     Ok(())
@@ -112,8 +133,9 @@ fn test_change_file_preserve_size() -> Result<()> {
     let repo = init_repo(dir)?;
 
     {
-        let (_, index) = repo.get_files_and_index()?;
-        assert_eq!(repo.changed_files(&index).count(), 0);
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 0);
     }
 
     {
@@ -130,8 +152,13 @@ fn test_change_file_preserve_size() -> Result<()> {
     }
 
     {
-        let (_, index) = repo.get_files_and_index()?;
-        assert_eq!(repo.changed_files(&index).count(), 1);
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 1);
+
+        for (_, change) in files {
+            assert_eq!(change, Change::Modified);
+        }
     }
 
     Ok(())
@@ -146,15 +173,17 @@ fn test_no_change_touched() -> Result<()> {
     let repo = init_repo(dir)?;
 
     {
-        let (_, index) = repo.get_files_and_index()?;
-        assert_eq!(repo.changed_files(&index).count(), 0);
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 0);
     }
 
     filetime::set_file_mtime(dir.join("file1"), filetime::FileTime::now())?;
 
     {
-        let (_, index) = repo.get_files_and_index()?;
-        assert_eq!(repo.changed_files(&index).count(), 0);
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 0);
     }
 
     Ok(())
@@ -169,15 +198,21 @@ fn test_delete_file() -> Result<()> {
     let repo = init_repo(dir)?;
 
     {
-        let (_, index) = repo.get_files_and_index()?;
-        assert_eq!(repo.deleted_files(&index).count(), 0);
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 0);
     }
 
     std::fs::remove_file(dir.join("file1"))?;
 
     {
-        let (_, index) = repo.get_files_and_index()?;
-        assert_eq!(repo.deleted_files(&index).count(), 1);
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 1);
+
+        for (_, change) in files {
+            assert_eq!(change, Change::Removed);
+        }
     }
 
     Ok(())

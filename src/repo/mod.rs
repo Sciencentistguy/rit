@@ -5,7 +5,7 @@ mod head;
 mod ignore;
 mod refs;
 mod show_head;
-mod status;
+pub mod status;
 mod workspace;
 
 use camino::{Utf8Path, Utf8PathBuf};
