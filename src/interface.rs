@@ -15,7 +15,7 @@ pub enum Command {
 
     Add {
         #[clap(env = "RIT_ADD_PATH", multiple_values = true)]
-        path: Vec<Utf8PathBuf>,
+        paths: Vec<Utf8PathBuf>,
     },
 
     #[clap(subcommand)]

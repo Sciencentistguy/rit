@@ -23,7 +23,7 @@ fn init_repo(dir: &Utf8Path) -> Result<Repo> {
     Repo::init(dir)?;
 
     let mut repo = Repo::open(dir.to_owned())?;
-    repo.add(&[".".into()])?;
+    repo.add_all()?;
     repo.commit("test")?;
     Ok(repo)
 }
@@ -211,6 +211,118 @@ fn test_delete_file() -> Result<()> {
 
         for (_, change) in files {
             assert_eq!(change, Change::Removed);
+        }
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_index_add() -> Result<()> {
+    let dir = TempDir::new("")?;
+    let dir = dir.path();
+    let dir = Utf8Path::from_path(dir).unwrap();
+
+    let mut repo = init_repo(dir)?;
+
+    {
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 0);
+    }
+
+    crate::create_test_files!(dir, ["file5", "file6", "file7", "file8"]);
+
+    repo.add_all()?;
+
+    {
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 4);
+
+        for (_, change) in files {
+            assert_eq!(change, Change::IndexAdded);
+        }
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_index_modify() -> Result<()> {
+    let dir = TempDir::new("")?;
+    let dir = dir.path();
+    let dir = Utf8Path::from_path(dir).unwrap();
+
+    let mut repo = init_repo(dir)?;
+
+    {
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 0);
+    }
+
+    write!(
+        std::fs::File::options()
+            .append(true)
+            .open(dir.join("file1"))?,
+        "-changed"
+    )?;
+
+    repo.add_all()?;
+
+    {
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 1);
+
+        for (_, change) in files {
+            assert_eq!(change, Change::IndexModified);
+        }
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_index_remove() -> Result<()> {
+    let dir = TempDir::new("")?;
+    let dir = dir.path();
+    let dir = Utf8Path::from_path(dir).unwrap();
+
+    std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
+    std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
+
+    Repo::init(dir)?;
+
+    crate::create_test_files!(dir, ["file1", "file2", "file3", "file4"]);
+
+    let mut repo = Repo::open(dir.to_owned())?;
+    repo.add_all()?;
+    repo.commit("h")?;
+
+    {
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 0);
+    }
+
+    std::fs::remove_file(dir.join("file1"))?;
+
+    // rit doesn't have an `rm`, and `add` doesn't know how to add files that don't exist.
+    std::fs::remove_file(dir.join(".git/index"))?;
+    assert!(!dir.join(".git/index").exists());
+    drop(repo);
+    let mut repo = Repo::open(dir.to_owned())?;
+    repo.add_all()?;
+
+    {
+        let status = Status::new(&repo)?.unwrap();
+        let files = status.get_statuses()?;
+        assert_eq!(files.len(), 1);
+
+        for (_, change) in files {
+            assert_eq!(change, Change::IndexRemoved);
         }
     }
 

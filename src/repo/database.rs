@@ -241,7 +241,7 @@ mod tests {
 
         crate::create_test_files!(root, ["file1"]);
 
-        repo.add(&[".".into()])?;
+        repo.add_all()?;
 
         let commit_id = repo.commit("test")?;
 

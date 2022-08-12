@@ -36,4 +36,8 @@ impl super::Repo {
 
         Ok(())
     }
+
+    pub fn add_all(&mut self) -> Result<()> {
+        self.add(&[".".into()])
+    }
 }

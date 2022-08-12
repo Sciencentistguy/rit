@@ -50,7 +50,7 @@ fn commit() -> Result<()> {
     Repo::init(dir_rit)?;
     let mut rit_repo = Repo::open(dir_rit.to_owned())?;
     write_test_files(dir_rit)?;
-    rit_repo.add(&[".".into()])?;
+    rit_repo.add_all()?;
     let commit_id = rit_repo.commit("test")?;
 
     Command::new("git")
@@ -166,7 +166,7 @@ pub(super) fn commit_file_hierarchy() -> Result<()> {
     // Test files:
     // - a/b/c.txt: a file in a directory
     crate::create_test_files!(dir_rit, ["a/b/c.txt"]);
-    rit_repo.add(&[".".into()])?;
+    rit_repo.add_all()?;
     let commit_id = rit_repo.commit("test")?;
 
     Command::new("git")

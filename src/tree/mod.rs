@@ -123,7 +123,8 @@ impl Tree {
         &self.entries
     }
 
-    pub fn contains(&self, name: &str) -> bool {
+    pub fn contains(&self, name: impl AsRef<str>) -> bool {
+        let name = name.as_ref();
         if self.entries.contains_key(name) {
             return true;
         }

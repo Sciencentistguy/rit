@@ -290,7 +290,7 @@ mod tests {
 
         Repo::init(dir)?;
         let mut rit_repo = Repo::open(dir.to_owned())?;
-        rit_repo.add(&[".".into()])?;
+        rit_repo.add_all()?;
         let rit_index = std::fs::read(dir.join(".git/index"))?;
 
         std::fs::remove_dir_all(dir.join(".git"))?;
