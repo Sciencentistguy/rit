@@ -8,8 +8,8 @@ use std::{collections::HashMap, fmt::Display, io::Write};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use rayon::prelude::*;
-use tabwriter::TabWriter;
 use tap::Tap;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use super::Repo;
 
@@ -35,11 +35,12 @@ impl super::Repo {
 }
 
 fn print_long_status(statuses: &[(&Utf8Path, Change)]) -> std::io::Result<()> {
-    let mut tw = TabWriter::new(std::io::stdout());
+    let mut writer = StandardStream::stdout(ColorChoice::Auto);
 
     let mut it = statuses.iter().filter(|x| x.1.is_index()).peekable();
     if it.peek().is_some() {
-        writeln!(&mut tw, "Changes to be committed:")?;
+        writeln!(&mut writer, "Changes to be committed:")?;
+        writer.set_color(ColorSpec::new().set_fg(Some(Color::Green)))?;
         for (path, status) in it {
             let word = match status {
                 Change::IndexAdded => "new file",
@@ -47,15 +48,16 @@ fn print_long_status(statuses: &[(&Utf8Path, Change)]) -> std::io::Result<()> {
                 Change::IndexModified => "modified",
                 _ => unreachable!(),
             };
-            writeln!(&mut tw, "\t{word}: {path}")?;
+            writeln!(&mut writer, "\t{word}: {path}")?;
         }
-        writeln!(&mut tw)?;
+        writer.reset()?;
+        writeln!(&mut writer)?;
     }
-    // println!("  (use \"rit reset HEAD <file>...\" to unstage)");
 
     let mut it = statuses.iter().filter(|x| !x.1.is_index()).peekable();
     if it.peek().is_some() {
-        writeln!(&mut tw, "Changes not staged for commit:")?;
+        writeln!(&mut writer, "Changes not staged for commit:")?;
+        writer.set_color(ColorSpec::new().set_fg(Some(Color::Red)))?;
         for (path, status) in it {
             let word = match status {
                 Change::Untracked => continue,
@@ -63,9 +65,10 @@ fn print_long_status(statuses: &[(&Utf8Path, Change)]) -> std::io::Result<()> {
                 Change::Modified => "modified",
                 _ => unreachable!(),
             };
-            writeln!(&mut tw, "\t{word}: {path}")?;
+            writeln!(&mut writer, "\t{word}: {path}")?;
         }
-        writeln!(&mut tw)?;
+        writer.reset()?;
+        writeln!(&mut writer)?;
     }
 
     let mut it = statuses
@@ -73,13 +76,15 @@ fn print_long_status(statuses: &[(&Utf8Path, Change)]) -> std::io::Result<()> {
         .filter(|x| matches!(x.1, Change::Untracked))
         .peekable();
     if it.peek().is_some() {
-        writeln!(&mut tw, "Untracked files:")?;
+        writeln!(&mut writer, "Untracked files:")?;
+        writer.set_color(ColorSpec::new().set_fg(Some(Color::Red)))?;
         for (path, _) in it {
-            writeln!(&mut tw, "\t{path}")?;
+            writeln!(&mut writer, "\t{path}")?;
         }
+        writer.reset()?;
     }
 
-    tw.flush()?;
+    writer.flush()?;
 
     Ok(())
 }
