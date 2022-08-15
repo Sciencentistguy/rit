@@ -79,7 +79,10 @@ fn main() -> Result<()> {
 
         Command::CatFile(args) => cat_file::handle(&mut repo, args)?,
 
-        Command::Status => repo.status()?,
+        Command::Status { porcelain, long } => {
+            let long = (!porcelain) || *long;
+            repo.status(long)?
+        }
 
         Command::ShowHead { oid } => repo.show_head(oid.clone())?,
     }

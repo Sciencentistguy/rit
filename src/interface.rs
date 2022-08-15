@@ -21,7 +21,15 @@ pub enum Command {
     #[clap(subcommand)]
     CatFile(CatFile),
 
-    Status,
+    Status {
+        /// Display status in porcelain format.
+        #[clap(long)]
+        porcelain: bool,
+
+        /// Display status in long format. This is the default behaviour if no flags are given.
+        #[clap(long, conflicts_with = "porcelain")]
+        long: bool,
+    },
 
     ShowHead {
         oid: Option<Digest>,

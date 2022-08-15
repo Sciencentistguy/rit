@@ -13,7 +13,7 @@ use tap::Tap;
 use super::Repo;
 
 impl super::Repo {
-    pub fn status(&self) -> Result<()> {
+    pub fn status(&self, long: bool) -> Result<()> {
         let status = match Status::new(self)? {
             Some(x) => x,
             None => return Ok(()),
@@ -23,11 +23,61 @@ impl super::Repo {
             .get_statuses()?
             .tap_mut(|v| v.sort_unstable_by_key(|x| x.0));
 
-        for (path, change) in statuses {
-            println!("{} {}", change, path);
+        if long {
+            print_long_status(&statuses);
+        } else {
+            print_porcelain_status(&statuses);
         }
 
         Ok(())
+    }
+}
+
+fn print_long_status(statuses: &[(&Utf8Path, Change)]) {
+    let mut it = statuses.iter().filter(|x| x.1.is_index()).peekable();
+    if it.peek().is_some() {
+        println!("Changes to be committed:");
+        for (path, status) in it {
+            let word = match status {
+                Change::IndexAdded => "new file",
+                Change::IndexRemoved => "deleted",
+                Change::IndexModified => "modified",
+                _ => unreachable!(),
+            };
+            println!("{word}: {path}");
+        }
+    }
+    // println!("  (use \"rit reset HEAD <file>...\" to unstage)");
+
+    let mut it = statuses.iter().filter(|x| !x.1.is_index()).peekable();
+    if it.peek().is_some() {
+        println!("Changes not staged for commit:");
+        for (path, status) in it {
+            let word = match status {
+                Change::Untracked => continue,
+                Change::Removed => "deleted",
+                Change::Modified => "modified",
+                _ => unreachable!(),
+            };
+            println!("{word}: {path}");
+        }
+    }
+
+    let mut it = statuses
+        .iter()
+        .filter(|x| matches!(x.1, Change::Untracked))
+        .peekable();
+    if it.peek().is_some() {
+        println!("Untracked files:");
+        for (path, _) in it {
+            println!("{path}");
+        }
+    }
+}
+
+fn print_porcelain_status(statuses: &[(&Utf8Path, Change)]) {
+    for (path, change) in statuses {
+        println!("{} {}", change, path);
     }
 }
 
@@ -46,6 +96,15 @@ pub enum Change {
     IndexAdded,
     IndexRemoved,
     IndexModified,
+}
+
+impl Change {
+    fn is_index(self) -> bool {
+        matches!(
+            self,
+            Change::IndexAdded | Change::IndexRemoved | Change::IndexModified
+        )
+    }
 }
 
 impl Display for Change {
