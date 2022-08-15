@@ -4,10 +4,11 @@ use crate::tree::Tree;
 use crate::Result;
 use crate::{blob::Blob, tree::TreeEntry};
 
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, io::Write};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use rayon::prelude::*;
+use tabwriter::TabWriter;
 use tap::Tap;
 
 use super::Repo;
@@ -24,7 +25,7 @@ impl super::Repo {
             .tap_mut(|v| v.sort_unstable_by_key(|x| x.0));
 
         if long {
-            print_long_status(&statuses);
+            print_long_status(&statuses)?;
         } else {
             print_porcelain_status(&statuses);
         }
@@ -33,10 +34,12 @@ impl super::Repo {
     }
 }
 
-fn print_long_status(statuses: &[(&Utf8Path, Change)]) {
+fn print_long_status(statuses: &[(&Utf8Path, Change)]) -> std::io::Result<()> {
+    let mut tw = TabWriter::new(std::io::stdout());
+
     let mut it = statuses.iter().filter(|x| x.1.is_index()).peekable();
     if it.peek().is_some() {
-        println!("Changes to be committed:");
+        writeln!(&mut tw, "Changes to be committed:")?;
         for (path, status) in it {
             let word = match status {
                 Change::IndexAdded => "new file",
@@ -44,14 +47,15 @@ fn print_long_status(statuses: &[(&Utf8Path, Change)]) {
                 Change::IndexModified => "modified",
                 _ => unreachable!(),
             };
-            println!("{word}: {path}");
+            writeln!(&mut tw, "\t{word}: {path}")?;
         }
+        writeln!(&mut tw)?;
     }
     // println!("  (use \"rit reset HEAD <file>...\" to unstage)");
 
     let mut it = statuses.iter().filter(|x| !x.1.is_index()).peekable();
     if it.peek().is_some() {
-        println!("Changes not staged for commit:");
+        writeln!(&mut tw, "Changes not staged for commit:")?;
         for (path, status) in it {
             let word = match status {
                 Change::Untracked => continue,
@@ -59,8 +63,9 @@ fn print_long_status(statuses: &[(&Utf8Path, Change)]) {
                 Change::Modified => "modified",
                 _ => unreachable!(),
             };
-            println!("{word}: {path}");
+            writeln!(&mut tw, "\t{word}: {path}")?;
         }
+        writeln!(&mut tw)?;
     }
 
     let mut it = statuses
@@ -68,11 +73,15 @@ fn print_long_status(statuses: &[(&Utf8Path, Change)]) {
         .filter(|x| matches!(x.1, Change::Untracked))
         .peekable();
     if it.peek().is_some() {
-        println!("Untracked files:");
+        writeln!(&mut tw, "Untracked files:")?;
         for (path, _) in it {
-            println!("{path}");
+            writeln!(&mut tw, "\t{path}")?;
         }
     }
+
+    tw.flush()?;
+
+    Ok(())
 }
 
 fn print_porcelain_status(statuses: &[(&Utf8Path, Change)]) {
