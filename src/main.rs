@@ -15,6 +15,7 @@ mod repo;
 mod storable;
 mod tree;
 mod util;
+mod diff;
 
 use camino::Utf8PathBuf;
 use color_eyre::eyre::Context;
