@@ -1,7 +1,10 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use tap::Tap;
 
-use crate::{blob::Blob, digest::Digest, filemode::FileMode, storable::Storable, Result};
+use crate::{
+    blob::Blob, digest::Digest, filemode::FileMode, index::IndexEntry, storable::Storable,
+    tree::Tree, Result,
+};
 
 use super::{
     status::{Change, Status},
@@ -9,7 +12,7 @@ use super::{
 };
 
 impl super::Repo {
-    pub fn diff(&self) -> Result<()> {
+    pub fn diff(&self, cached: bool) -> Result<()> {
         let status = match Status::new(self)? {
             Some(x) => x,
             None => return Ok(()),
@@ -19,19 +22,36 @@ impl super::Repo {
             .get_statuses()?
             .tap_mut(|v| v.sort_unstable_by_key(|x| x.0));
 
-        for (path, change) in changes {
-            match change {
-                Change::Modified | Change::Removed => self.diff_file(path)?,
-                _ => {}
+        if cached {
+            let tree = status.tree();
+
+            for (path, change) in changes {
+                match change {
+                    Change::IndexModified | Change::IndexAdded | Change::IndexRemoved => {
+                        let a = DiffTarget::from_index(path, self);
+                        let b = DiffTarget::from_head(path, tree);
+                        self.diff_files(a, b)?
+                    }
+                    _ => {}
+                }
+            }
+        } else {
+            for (path, change) in changes {
+                match change {
+                    Change::Modified | Change::Removed => {
+                        let a = DiffTarget::from_file(path)?;
+                        let b = DiffTarget::from_index(path, self);
+                        self.diff_files(a, b)?
+                    }
+                    _ => {}
+                }
             }
         }
 
         Ok(())
     }
 
-    fn diff_file(&self, path: &Utf8Path) -> Result<()> {
-        let (a, b) = DiffTarget::new(path, self)?;
-
+    fn diff_files(&self, a: DiffTarget, b: DiffTarget) -> Result<()> {
         println!("diff --git {} {}", a.path(), b.path());
 
         self.print_diff_mode(&a, &b);
@@ -78,41 +98,43 @@ enum DiffTarget {
 pub const NULL_PATH: &str = "/dev/null";
 
 impl DiffTarget {
-    /// Construct a pair of DiffTargets, `a`, and `b`. The first is guaranteed to be of variant
-    /// [`Modified`], whereas the latter may be [`Removed`].
-    ///
-    /// [`Removed`]: DiffTarget::Removed
-    /// [`Modified`]: DiffTarget::Modified
-    fn new(path: &Utf8Path, repo: &Repo) -> Result<(Self, Self)> {
-        let entry = repo
-            .index
-            .get_entry_by_path(path)
-            .expect("file is not in index");
-        let a_oid = entry.oid().clone();
-        let a_mode = entry.mode();
-        let a_path = Utf8Path::new("a").join(path);
-
-        let a = Self::Modified {
-            oid: a_oid,
-            mode: a_mode,
-            path: a_path,
-        };
-
+    fn from_file(path: &Utf8Path) -> Result<Self> {
         if !path.exists() {
-            Ok((a, Self::Removed))
+            Ok(Self::Removed)
         } else {
-            let file = std::fs::read(path)?;
-            let blob = Blob::new(file);
-            let b_oid = blob.oid(&blob.format());
-            let b_path = Utf8Path::new("b").join(path);
-            let b_mode = FileMode::from(&Repo::stat_file(path)?.unwrap());
-            let b = Self::Modified {
-                oid: b_oid,
-                mode: b_mode,
-                path: b_path,
-            };
-            Ok((a, b))
+            let bytes = std::fs::read(path)?;
+            let blob = Blob::new(bytes);
+            let formatted = blob.format();
+
+            let oid = blob.oid(&formatted);
+            let mode = FileMode::from(&Repo::stat_file(path)?.unwrap());
+            let path = Utf8Path::new("b").join(path);
+            Ok(Self::Modified { oid, mode, path })
         }
+    }
+
+    fn from_index(path: &Utf8Path, repo: &Repo) -> Self {
+        let entry = match repo.index.get_entry_by_path(path) {
+            Some(x) => x,
+            None => return Self::Removed,
+        };
+        Self::from_entry(path, entry)
+    }
+
+    fn from_head(path: &Utf8Path, tree: &Tree) -> Self {
+        let entry = match tree.get_entry(path.as_str()) {
+            Some(x) => x,
+            None => return Self::Removed,
+        };
+        Self::from_entry(path, entry)
+    }
+
+    fn from_entry(path: &Utf8Path, entry: &IndexEntry) -> Self {
+        let oid = entry.oid().clone();
+        let mode = entry.mode();
+        let path = Utf8Path::new("a").join(path);
+
+        Self::Modified { oid, mode, path }
     }
 
     fn oid(&self) -> &Digest {

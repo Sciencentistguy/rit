@@ -246,4 +246,8 @@ impl<'r: 'i, 'i> Status<'r, 'i> {
 
         Ok(*entry.oid() != new_oid)
     }
+
+    pub fn tree(&self) -> &Tree {
+        &self.head_tree
+    }
 }

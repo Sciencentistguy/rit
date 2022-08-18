@@ -6,6 +6,7 @@ mod test;
 mod blob;
 mod cat_file;
 mod commit;
+mod diff;
 mod digest;
 mod filemode;
 mod index;
@@ -15,7 +16,6 @@ mod repo;
 mod storable;
 mod tree;
 mod util;
-mod diff;
 
 use camino::Utf8PathBuf;
 use color_eyre::eyre::Context;
@@ -105,9 +105,7 @@ fn main() -> Result<()> {
             repo.status(long)?
         }
 
-        Command::Diff {cached: _} => {
-            repo.diff()?
-        }
+        Command::Diff { cached } => repo.diff(*cached)?,
 
         Command::ShowHead { oid } => repo.show_head(oid.clone())?,
     };
