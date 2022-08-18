@@ -28,8 +28,8 @@ impl super::Repo {
             for (path, change) in changes {
                 match change {
                     Change::IndexModified | Change::IndexAdded | Change::IndexRemoved => {
-                        let a = DiffTarget::from_index(path, self);
-                        let b = DiffTarget::from_head(path, tree);
+                        let a = DiffTarget::from_head(path, tree);
+                        let b = DiffTarget::from_index(path, self);
                         self.diff_files(a, b)?
                     }
                     _ => {}
@@ -62,7 +62,9 @@ impl super::Repo {
     }
 
     fn print_diff_mode(&self, a: &DiffTarget, b: &DiffTarget) {
-        if b.is_removed() {
+        if a.is_removed() {
+            println!("added file mode {:o}", b.mode().unwrap());
+        } else if b.is_removed() {
             println!("deleted file mode {:o}", a.mode().unwrap());
         } else if a.mode() != b.mode() {
             println!("old mode {:o}", a.mode().unwrap());
@@ -71,9 +73,10 @@ impl super::Repo {
     }
 
     fn print_diff_content(&self, a: &DiffTarget, b: &DiffTarget) {
-        if b.is_removed() {
-            println!("index {}..{}", a.oid().short(), b.oid().short(),);
+        if a.mode() != b.mode() {
+            println!("index {}..{}", a.oid().short(), b.oid().short());
         } else {
+            assert!(a.mode().is_some());
             println!(
                 "index {}..{} {:o}",
                 a.oid().short(),
