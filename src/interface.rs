@@ -37,6 +37,11 @@ pub enum Command {
         long: bool,
     },
 
+    Diff {
+        #[clap(long)]
+        cached: bool,
+    },
+
     /// Equivalent to `jit/show_head.rb`
     ShowHead { oid: Option<Digest> },
 }

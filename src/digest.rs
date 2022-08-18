@@ -6,6 +6,7 @@ use std::{
 };
 
 use sha1::{Digest as _, Sha1};
+use tap::Tap;
 
 #[derive(Clone, Default, PartialEq, Eq)]
 #[repr(transparent)]
@@ -32,6 +33,13 @@ impl Digest {
     /// Identical to `format!("{:x}", self)`.
     pub fn to_hex(&self) -> String {
         hex::encode(self.0)
+    }
+
+    /// Shorten a Digest, usually for display purposes.
+    ///
+    /// Note: This doesn't check for collisions.
+    pub fn short(&self) -> String {
+        self.to_hex().tap_mut(|x| x.truncate(7))
     }
 }
 

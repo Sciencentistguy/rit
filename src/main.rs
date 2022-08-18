@@ -105,8 +105,12 @@ fn main() -> Result<()> {
             repo.status(long)?
         }
 
+        Command::Diff {cached: _} => {
+            repo.diff()?
+        }
+
         Command::ShowHead { oid } => repo.show_head(oid.clone())?,
-    }
+    };
 
     Ok(())
 }

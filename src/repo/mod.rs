@@ -1,6 +1,7 @@
 mod add;
 mod commit;
 pub mod database;
+mod diff;
 mod head;
 mod ignore;
 mod refs;

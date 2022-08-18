@@ -225,6 +225,10 @@ impl IndexWrapper {
             self.entries.swap_remove(idx);
         }
     }
+
+    pub fn get_entry_by_path(&self, path: &Utf8Path) -> Option<&IndexEntry> {
+        self.entries.iter().find(|e| e.path() == path)
+    }
 }
 
 #[cfg(test)]
