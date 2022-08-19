@@ -5,6 +5,7 @@ use std::{
     str::FromStr,
 };
 
+use hex::FromHexError;
 use sha1::{Digest as _, Sha1};
 use tap::Tap;
 
@@ -81,7 +82,9 @@ impl FromStr for Digest {
 
     fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
         let bytes = hex::decode(s)?;
-        assert!(bytes.len() == 20);
+        if bytes.len() != 20 {
+            return Err(FromHexError::InvalidStringLength)
+        }
         Ok(Digest(bytes.try_into().unwrap()))
     }
 }
