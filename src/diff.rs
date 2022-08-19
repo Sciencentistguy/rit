@@ -16,6 +16,10 @@ pub fn diff<'a>(b: &[&'a str], a: &[&'a str]) -> Vec<Edit<'a>> {
     myers.diff()
 }
 
+pub fn hunks<'a>(edits: &[Edit<'a>]) -> Vec<Hunk<'a>> {
+    Hunk::filter(edits)
+}
+
 #[derive(Debug)]
 struct Myers<'a, 'b> {
     a: &'b [Line<'a>],
@@ -29,7 +33,7 @@ pub enum EditKind {
     Equal,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Edit<'a> {
     kind: EditKind,
     a_line: Option<Line<'a>>,
@@ -161,6 +165,101 @@ impl<'a> Myers<'a, '_> {
     }
 }
 
+pub struct Hunk<'a> {
+    a_start: usize,
+    b_start: usize,
+    edits: Vec<Edit<'a>>,
+}
+
+/// The amount of context given to each hunk displayed
+const HUNK_CONTEXT: usize = 3;
+
+impl<'a> Hunk<'a> {
+    fn filter(edits: &[Edit<'a>]) -> Vec<Self> {
+        let mut hunks = Vec::new();
+        let mut offset = 0;
+
+        loop {
+            while edits.get(offset).map(|x| x.kind) == Some(EditKind::Equal) {
+                offset += 1;
+            }
+
+            if offset >= edits.len() {
+                return hunks;
+            }
+
+            offset = offset.saturating_sub(HUNK_CONTEXT + 1);
+
+            let a_start = edits[offset].a_line.unwrap().index;
+            let b_start = edits[offset].a_line.unwrap().index;
+            hunks.push(Hunk {
+                a_start,
+                b_start,
+                edits: Vec::new(),
+            });
+
+            offset = Hunk::build(hunks.last_mut().unwrap(), edits, offset);
+        }
+    }
+
+    fn build(hunk: &mut Self, edits: &[Edit<'a>], mut offset: usize) -> usize {
+        let mut counter = -1;
+
+        while counter != 0 {
+            if counter > 0 {
+                hunk.edits.push(edits[offset].clone())
+            }
+
+            offset += 1;
+            if offset >= edits.len() {
+                break;
+            }
+
+            match edits.get(offset + HUNK_CONTEXT).map(|x| x.kind) {
+                Some(EditKind::Insert | EditKind::Delete) => counter = 2 * (HUNK_CONTEXT as isize) + 1,
+                Some(EditKind::Equal) | None => counter -= 1,
+                
+            }
+        }
+
+        offset
+    }
+
+    pub fn header(&self) -> String {
+        let (a_start, a_len) = self.offsets_for(LineKind::A, self.a_start);
+        let (b_start, b_len) = self.offsets_for(LineKind::B, self.b_start);
+
+        format!("@@ -{},{} +{},{} @@", a_start, a_len, b_start, b_len)
+    }
+
+    fn offsets_for(&self, mode: LineKind, default: usize) -> (usize, usize) {
+        let mut lines = self
+            .edits
+            .iter()
+            .filter_map(|e| match mode {
+                LineKind::A => e.a_line,
+                LineKind::B => e.b_line,
+            })
+            .peekable();
+
+        let start = lines.peek().map(|x| x.index).unwrap_or(default);
+
+        let lines = lines.count();
+
+        (start, lines)
+    }
+
+    pub fn edits(&self) -> &[Edit] {
+        self.edits.as_ref()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum LineKind {
+    A,
+    B,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,7 +277,10 @@ mod tests {
             &Edit {
                 kind: EditKind::Insert,
                 a_line: None,
-                b_line: Some(Line { line: "c", index: 4 }),
+                b_line: Some(Line {
+                    line: "c",
+                    index: 4
+                }),
             }
         );
     }

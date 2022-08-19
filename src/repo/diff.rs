@@ -99,8 +99,13 @@ impl super::Repo {
 
         let edits = crate::diff::diff(&a, &b);
 
-        for edit in edits {
-            println!("{}", edit);
+        let hunks = crate::diff::hunks(&edits);
+
+        for hunk in hunks {
+            println!("{}", hunk.header());
+            for edit in hunk.edits() {
+                println!("{}", edit);
+            }
         }
     }
 }
