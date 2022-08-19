@@ -44,6 +44,12 @@ pub enum Command {
 
     /// Equivalent to `jit/show_head.rb`
     ShowHead { oid: Option<Digest> },
+
+    Branch {
+        name: Option<String>,
+        #[clap(short = 'D', long)]
+        delete: bool,
+    },
 }
 
 // FIXME: This is exposing the full names of the subcommands.

@@ -23,7 +23,7 @@ impl super::Repo {
             }
         } else {
             let digest = Digest::from_str(contents)
-                .wrap_err(format!("Unexpected HEAD contents: {contents}"))?;
+                .wrap_err(eyre!("Unexpected HEAD contents: {contents}"))?;
             Ok(Some(digest))
         }
     }

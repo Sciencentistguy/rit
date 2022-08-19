@@ -16,8 +16,7 @@ pub fn diff<'a>(b: &[&'a str], a: &[&'a str]) -> Vec<Edit<'a>> {
     myers.diff()
 }
 
-/// Collect the calculated diff into a number of [`Hunk`]s, separated by large numbers of
-/// [`EditKind::Equal`] lines.
+/// Collect a slice of edits into a [`Vec`] of [`Hunk`]s.
 pub fn hunks<'a>(edits: &[Edit<'a>]) -> Vec<Hunk<'a>> {
     let mut hunks = Vec::new();
     let mut offset = 0;
@@ -33,8 +32,10 @@ pub fn hunks<'a>(edits: &[Edit<'a>]) -> Vec<Hunk<'a>> {
 
         offset = offset.saturating_sub(HUNK_CONTEXT + 1);
 
-        let a_start = edits[offset].a_line.unwrap().index;
-        let b_start = edits[offset].a_line.unwrap().index;
+        dbg!(&edits[offset]);
+
+        let a_start = edits[offset].a_line.map(|x| x.index);
+        let b_start = edits[offset].a_line.map(|x| x.index);
         hunks.push(Hunk {
             a_start,
             b_start,
@@ -169,13 +170,13 @@ impl<'a> Myers<'a, '_> {
         let n = self.a.len() as i64;
         let m = self.b.len() as i64;
         let max = n + m;
-        let mut v: HashMap<i64, i64> = HashMap::new();
+        let mut v = HashMap::new();
         v.insert(1, 0);
         let mut trace = Vec::new();
         for d in 0..max {
             trace.push(v.clone());
 
-            for k in (-(d as i64)..=d).step_by(2) {
+            for k in (-d..=d).step_by(2) {
                 let mut x = if (k == -d) || ((k != d) && (v[&(k - 1)] < v[&(k + 1)])) {
                     v[&(k + 1)]
                 } else {
@@ -201,8 +202,8 @@ impl<'a> Myers<'a, '_> {
 }
 
 pub struct Hunk<'a> {
-    a_start: usize,
-    b_start: usize,
+    a_start: Option<usize>,
+    b_start: Option<usize>,
     edits: Vec<Edit<'a>>,
 }
 
@@ -241,7 +242,7 @@ impl<'a> Hunk<'a> {
         format!("@@ -{},{} +{},{} @@", a_start, a_len, b_start, b_len)
     }
 
-    fn offsets_for(&self, mode: LineKind, default: usize) -> (usize, usize) {
+    fn offsets_for(&self, mode: LineKind, default: Option<usize>) -> (usize, usize) {
         let mut lines = self
             .edits
             .iter()
@@ -251,7 +252,7 @@ impl<'a> Hunk<'a> {
             })
             .peekable();
 
-        let start = lines.peek().map(|x| x.index).unwrap_or(default);
+        let start = lines.peek().map(|x| x.index).or(default).unwrap_or_default();
 
         let lines = lines.count();
 
@@ -262,7 +263,6 @@ impl<'a> Hunk<'a> {
         self.edits.as_ref()
     }
 }
-
 
 #[cfg(test)]
 mod tests {

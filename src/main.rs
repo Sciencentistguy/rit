@@ -108,6 +108,13 @@ fn main() -> Result<()> {
         Command::Diff { cached } => repo.diff(*cached)?,
 
         Command::ShowHead { oid } => repo.show_head(oid.clone())?,
+
+        Command::Branch {
+            name,
+            delete,
+        } => {
+            repo.branch(name.as_deref(), *delete)?
+        }
     };
 
     Ok(())

@@ -19,7 +19,6 @@ impl Digest {
     pub const NULL_DIGEST: Self = Digest([0; 20]);
 }
 
-
 impl Digest {
     /// Hash the input bytes and return the resulting digest.
     pub fn new(bytes: &[u8]) -> Self {
