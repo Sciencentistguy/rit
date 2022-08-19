@@ -12,6 +12,7 @@ mod filemode;
 mod index;
 mod interface;
 mod repo;
+mod revision;
 mod storable;
 mod tree;
 mod util;
@@ -108,12 +109,7 @@ fn main() -> Result<()> {
 
         Command::ShowHead { oid } => repo.show_head(oid.clone())?,
 
-        Command::Branch {
-            name,
-            delete,
-        } => {
-            repo.branch(name.as_deref(), *delete)?
-        }
+        Command::Branch { name, delete } => repo.branch(name.as_deref(), *delete)?,
     };
 
     Ok(())
