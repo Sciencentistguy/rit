@@ -2,14 +2,24 @@ use std::{collections::HashMap, fmt::Display};
 
 /// Compute the difference between two slices of strings, using the Myers diff algorithm
 pub fn diff<'a>(b: &[&'a str], a: &[&'a str]) -> Vec<Edit<'a>> {
-    let myers = Myers { b, a };
+    let a = a
+        .iter()
+        .enumerate()
+        .map(|(index, line)| Line { line, index })
+        .collect::<Vec<_>>();
+    let b = b
+        .iter()
+        .enumerate()
+        .map(|(index, line)| Line { line, index })
+        .collect::<Vec<_>>();
+    let myers = Myers { a: &a, b: &b };
     myers.diff()
 }
 
 #[derive(Debug)]
 struct Myers<'a, 'b> {
-    a: &'b [&'a str],
-    b: &'b [&'a str],
+    a: &'b [Line<'a>],
+    b: &'b [Line<'a>],
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -22,14 +32,33 @@ pub enum EditKind {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Edit<'a> {
     kind: EditKind,
-    line: &'a str,
+    a_line: Option<Line<'a>>,
+    b_line: Option<Line<'a>>,
 }
 
 impl<'a> Edit<'a> {
-    fn new(kind: EditKind, line: &'a str) -> Self {
-        Edit { kind, line }
+    fn new(kind: EditKind, a_line: Option<Line<'a>>, b_line: Option<Line<'a>>) -> Self {
+        Edit {
+            kind,
+            a_line,
+            b_line,
+        }
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+struct Line<'a> {
+    line: &'a str,
+    index: usize,
+}
+
+impl PartialEq for Line<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.line == other.line
+    }
+}
+
+impl Eq for Line<'_> {}
 
 impl Display for Edit<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -38,7 +67,8 @@ impl Display for Edit<'_> {
             EditKind::Delete => '-',
             EditKind::Equal => ' ',
         };
-        write!(f, "{}{}", char, self.line)
+        let line = self.a_line.unwrap_or_else(|| self.b_line.unwrap());
+        write!(f, "{}{}", char, line.line)
     }
 }
 
@@ -51,11 +81,15 @@ impl<'a> Myers<'a, '_> {
             let b_line = self.b.get(prev_y as usize);
 
             if x == prev_x {
-                diff.push(Edit::new(EditKind::Insert, b_line.unwrap()));
+                diff.push(Edit::new(EditKind::Insert, None, Some(*b_line.unwrap())));
             } else if y == prev_y {
-                diff.push(Edit::new(EditKind::Delete, a_line.unwrap()));
+                diff.push(Edit::new(EditKind::Delete, Some(*a_line.unwrap()), None));
             } else {
-                diff.push(Edit::new(EditKind::Equal, a_line.unwrap()));
+                diff.push(Edit::new(
+                    EditKind::Equal,
+                    Some(*a_line.unwrap()),
+                    Some(*b_line.unwrap()),
+                ));
             }
         });
 
@@ -133,8 +167,8 @@ mod tests {
 
     #[test]
     fn diff_works() {
-        let a = ["a", "b", "b", "a"];
-        let b = ["a", "b", "b", "a", "c"];
+        let b = ["a", "b", "b", "a"];
+        let a = ["a", "b", "b", "a", "c"];
         let diff = diff(&a, &b);
         println!("{:?}", diff);
 
@@ -143,7 +177,8 @@ mod tests {
             diff.last().unwrap(),
             &Edit {
                 kind: EditKind::Insert,
-                line: "c"
+                a_line: None,
+                b_line: Some(Line { line: "c", index: 4 }),
             }
         );
     }

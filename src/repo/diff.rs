@@ -28,8 +28,8 @@ impl super::Repo {
             for (path, change) in changes {
                 match change {
                     Change::IndexModified | Change::IndexAdded | Change::IndexRemoved => {
-                        let a = DiffTarget::from_head(path, self, tree)?;
-                        let b = DiffTarget::from_index(path, self)?;
+                        let a = DiffTarget::from_index(path, self)?;
+                        let b = DiffTarget::from_head(path, self, tree)?;
                         self.diff_files(a, b)?
                     }
                     _ => {}
