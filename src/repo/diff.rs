@@ -1,9 +1,10 @@
 use camino::{Utf8Path, Utf8PathBuf};
 use tap::Tap;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use crate::{
-    blob::Blob, digest::Digest, filemode::FileMode, index::IndexEntry, storable::Storable,
-    tree::Tree, Result,
+    blob::Blob, diff::EditKind, digest::Digest, filemode::FileMode, index::IndexEntry,
+    storable::Storable, tree::Tree, Result,
 };
 
 use super::{
@@ -101,9 +102,25 @@ impl super::Repo {
 
         let hunks = crate::diff::hunks(&edits);
 
+        let mut writer = StandardStream::stdout(ColorChoice::Auto);
+
         for hunk in hunks {
+            writer
+                .set_color(ColorSpec::new().set_fg(Some(Color::Ansi256(244))))
+                .unwrap();
             println!("{}", hunk.header());
+            writer.reset().unwrap();
             for edit in hunk.edits() {
+                match edit.kind() {
+                    EditKind::Insert => writer
+                        .set_color(ColorSpec::new().set_fg(Some(Color::Green)))
+                        .unwrap(),
+                    EditKind::Delete => writer
+                        .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
+                        .unwrap(),
+                    EditKind::Equal => writer.reset().unwrap(),
+                };
+
                 println!("{}", edit);
             }
         }

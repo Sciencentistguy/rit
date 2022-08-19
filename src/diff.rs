@@ -16,8 +16,33 @@ pub fn diff<'a>(b: &[&'a str], a: &[&'a str]) -> Vec<Edit<'a>> {
     myers.diff()
 }
 
+/// Collect the calculated diff into a number of [`Hunk`]s, separated by large numbers of
+/// [`EditKind::Equal`] lines.
 pub fn hunks<'a>(edits: &[Edit<'a>]) -> Vec<Hunk<'a>> {
-    Hunk::filter(edits)
+    let mut hunks = Vec::new();
+    let mut offset = 0;
+
+    loop {
+        while edits.get(offset).map(|x| x.kind) == Some(EditKind::Equal) {
+            offset += 1;
+        }
+
+        if offset >= edits.len() {
+            return hunks;
+        }
+
+        offset = offset.saturating_sub(HUNK_CONTEXT + 1);
+
+        let a_start = edits[offset].a_line.unwrap().index;
+        let b_start = edits[offset].a_line.unwrap().index;
+        hunks.push(Hunk {
+            a_start,
+            b_start,
+            edits: Vec::new(),
+        });
+
+        offset = Hunk::build(hunks.last_mut().unwrap(), edits, offset);
+    }
 }
 
 #[derive(Debug)]
@@ -31,6 +56,12 @@ pub enum EditKind {
     Insert,
     Delete,
     Equal,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum LineKind {
+    A,
+    B,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -47,6 +78,10 @@ impl<'a> Edit<'a> {
             a_line,
             b_line,
         }
+    }
+
+    pub fn kind(&self) -> EditKind {
+        self.kind
     }
 }
 
@@ -175,33 +210,6 @@ pub struct Hunk<'a> {
 const HUNK_CONTEXT: usize = 3;
 
 impl<'a> Hunk<'a> {
-    fn filter(edits: &[Edit<'a>]) -> Vec<Self> {
-        let mut hunks = Vec::new();
-        let mut offset = 0;
-
-        loop {
-            while edits.get(offset).map(|x| x.kind) == Some(EditKind::Equal) {
-                offset += 1;
-            }
-
-            if offset >= edits.len() {
-                return hunks;
-            }
-
-            offset = offset.saturating_sub(HUNK_CONTEXT + 1);
-
-            let a_start = edits[offset].a_line.unwrap().index;
-            let b_start = edits[offset].a_line.unwrap().index;
-            hunks.push(Hunk {
-                a_start,
-                b_start,
-                edits: Vec::new(),
-            });
-
-            offset = Hunk::build(hunks.last_mut().unwrap(), edits, offset);
-        }
-    }
-
     fn build(hunk: &mut Self, edits: &[Edit<'a>], mut offset: usize) -> usize {
         let mut counter = -1;
 
@@ -216,9 +224,10 @@ impl<'a> Hunk<'a> {
             }
 
             match edits.get(offset + HUNK_CONTEXT).map(|x| x.kind) {
-                Some(EditKind::Insert | EditKind::Delete) => counter = 2 * (HUNK_CONTEXT as isize) + 1,
+                Some(EditKind::Insert | EditKind::Delete) => {
+                    counter = 2 * (HUNK_CONTEXT as isize) + 1
+                }
                 Some(EditKind::Equal) | None => counter -= 1,
-                
             }
         }
 
@@ -254,11 +263,6 @@ impl<'a> Hunk<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum LineKind {
-    A,
-    B,
-}
 
 #[cfg(test)]
 mod tests {
