@@ -1,4 +1,5 @@
 use camino::Utf8PathBuf;
+use clap::ArgAction;
 use clap::Parser;
 use clap::Subcommand;
 
@@ -6,26 +7,43 @@ use crate::digest::Digest;
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
+    /// Create an empty Git repository, or reinitialize an existing one
     Init,
 
+    /// Record changes to the repository
     Commit {
         #[clap(short, long, env = "RIT_COMMIT_MESSAGE")]
         message: Option<String>,
     },
 
+    /// Add file contents to the index
     Add {
         #[clap(env = "RIT_ADD_PATH", multiple_values = true)]
         paths: Vec<Utf8PathBuf>,
     },
 
+    /// Provide content or type and size information for repository objects
     #[clap(subcommand)]
     CatFile(CatFile),
 
-    Status,
+    /// Show the working tree status
+    Status {
+        /// Display status in porcelain format.
+        #[clap(long)]
+        porcelain: bool,
 
-    ShowHead {
-        oid: Option<Digest>,
+        /// Display status in long format. This is the default behaviour if no flags are given.
+        #[clap(long, conflicts_with = "porcelain")]
+        long: bool,
     },
+
+    Diff {
+        #[clap(long)]
+        cached: bool,
+    },
+
+    /// Equivalent to `jit/show_head.rb`
+    ShowHead { oid: Option<Digest> },
 }
 
 // FIXME: This is exposing the full names of the subcommands.
@@ -75,8 +93,8 @@ pub struct Opt {
     #[clap(subcommand)]
     pub command: Command,
 
-    #[clap(short, long)]
-    pub verbose: bool,
+    #[clap(short, long, action(ArgAction::Count))]
+    pub verbose: u8,
 
     /// The path to be used.
     #[clap(short)]

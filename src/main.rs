@@ -6,6 +6,7 @@ mod test;
 mod blob;
 mod cat_file;
 mod commit;
+mod diff;
 mod digest;
 mod filemode;
 mod index;
@@ -19,6 +20,9 @@ mod util;
 use camino::Utf8PathBuf;
 use color_eyre::eyre::Context;
 pub use color_eyre::Result;
+use tracing::Level;
+use tracing_subscriber::fmt::Subscriber;
+use tracing_subscriber::EnvFilter;
 
 use crate::digest::Digest;
 use crate::interface::*;
@@ -26,17 +30,34 @@ use crate::repo::Repo;
 
 use clap::Parser;
 use once_cell::sync::Lazy;
-use tracing_subscriber::prelude::*;
 
 static ARGS: Lazy<Opt> = Lazy::new(Opt::parse);
 
 fn main() -> Result<()> {
     color_eyre::install().unwrap();
 
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .with(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
+    match ARGS.verbose {
+        0 => {
+            let subscriber = Subscriber::builder()
+                .with_env_filter(EnvFilter::from_default_env())
+                .finish();
+            tracing::subscriber::set_global_default(subscriber)?;
+        }
+        1 => {
+            let subscriber = Subscriber::builder()
+                .with_env_filter(EnvFilter::from_default_env())
+                .with_max_level(Level::INFO)
+                .finish();
+            tracing::subscriber::set_global_default(subscriber)?;
+        }
+        _ => {
+            let subscriber = Subscriber::builder()
+                .with_env_filter(EnvFilter::from_default_env())
+                .with_max_level(Level::TRACE)
+                .finish();
+            tracing::subscriber::set_global_default(subscriber)?;
+        }
+    };
 
     Lazy::force(&ARGS);
 
@@ -79,10 +100,15 @@ fn main() -> Result<()> {
 
         Command::CatFile(args) => cat_file::handle(&mut repo, args)?,
 
-        Command::Status => repo.status()?,
+        Command::Status { porcelain, long } => {
+            let long = (!porcelain) || *long;
+            repo.status(long)?
+        }
+
+        Command::Diff { cached } => repo.diff(*cached)?,
 
         Command::ShowHead { oid } => repo.show_head(oid.clone())?,
-    }
+    };
 
     Ok(())
 }

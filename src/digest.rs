@@ -6,10 +6,19 @@ use std::{
 };
 
 use sha1::{Digest as _, Sha1};
+use tap::Tap;
 
 #[derive(Clone, Default, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Digest(pub [u8; 20]);
+
+impl Digest {
+    /// The null digest, 0x00000...
+    ///
+    /// This is used for deleted / missing files.
+    pub const NULL_DIGEST: Self = Digest([0; 20]);
+}
+
 
 impl Digest {
     /// Hash the input bytes and return the resulting digest.
@@ -32,6 +41,13 @@ impl Digest {
     /// Identical to `format!("{:x}", self)`.
     pub fn to_hex(&self) -> String {
         hex::encode(self.0)
+    }
+
+    /// Shorten a Digest, usually for display purposes.
+    ///
+    /// Note: This doesn't check for collisions.
+    pub fn short(&self) -> String {
+        self.to_hex().tap_mut(|x| x.truncate(7))
     }
 }
 

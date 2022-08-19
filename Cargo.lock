@@ -796,6 +796,7 @@ dependencies = [
  "sha-1",
  "tap",
  "tempdir",
+ "termcolor",
  "tracing",
  "tracing-subscriber",
  "walkdir",
