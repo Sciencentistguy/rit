@@ -22,7 +22,7 @@ const DISALLOWED_CHARACTERS: [char; 40] = [
 
 /// Check whether a string is a valid ref name.
 ///
-/// This is not a port of `check_refname_component` from git, but is based on the documentation for
+/// This is not a port of `check_refname_component` from git's `refs.c`, but is based on the documentation for
 /// that function.
 ///
 /// Disallowed paths are any path where:
@@ -67,6 +67,11 @@ impl super::Repo {
         self.update_ref_file(&path, &self.read_head()?.unwrap())
     }
 
+    /// Set the value of a ref file to the specified oid. 
+    ///
+    /// This function does not use git locks. This is a design decision. This creates a possible
+    /// issue when multiple processes (realistically, git and rit) are contending a head file. The
+    /// solution to this is to Just Not run rit while a git process is running.
     fn update_ref_file(&self, path: &Utf8Path, oid: &Digest) -> Result<()> {
         dbg!(path);
         let mut file = File::create(path)?;
