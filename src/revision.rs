@@ -91,7 +91,7 @@ enum Refname {
 
 impl Refname {
     fn parse(input: &str) -> Result<Self> {
-        if matches!(input, "HEAD") {
+        if matches!(input, "HEAD" | "@") {
             return Ok(Self::Head);
         }
 
@@ -100,7 +100,7 @@ impl Refname {
         }
 
         if !is_valid_ref_name(input) {
-            return Err(eyre!("invalid ref name: {}", input));
+            return Err(eyre!("Invalid ref name: {}", input));
         }
 
         Ok(Self::BranchTag(input.to_owned()))
@@ -112,18 +112,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn works() {
-        let good_simple = ["HEAD", "master", "main", "origin/main", "v1.0.0"];
-
-        let rev = Rev::parse(good_simple[0]).unwrap();
+    fn head() {
+        let rev = "HEAD";
+        let rev = Rev::parse(rev).unwrap();
         assert_eq!(rev, Rev::Refname(Refname::Head));
+    }
 
-        for rev in &good_simple[1..] {
-            dbg!(rev);
-            let rev = Rev::parse(rev).unwrap();
-            assert!(matches!(rev, Rev::Refname(Refname::BranchTag(_))));
+    #[test]
+    fn sha1() {
+        let rev = "ffc1c862714edb677d6f467902cf2e406eee22ce";
+        let rev = Rev::parse(rev).unwrap();
+        let dig = Digest::from_str("ffc1c862714edb677d6f467902cf2e406eee22ce").unwrap();
+        assert_eq!(rev, Rev::Refname(Refname::Sha1(dig)));
+    }
+
+    #[test]
+    fn branch_tag() {
+        let branch_tag = ["master", "main", "origin/main", "v1.0.0"];
+        for name in branch_tag {
+            dbg!(name);
+            let rev = Rev::parse(name).unwrap();
+            assert_eq!(rev, Rev::Refname(Refname::BranchTag(name.to_owned())));
         }
+    }
 
+    #[test]
+    fn parents() {
         let parents = ["HEAD^", "HEAD^^"];
 
         for rev in parents {
@@ -137,14 +151,20 @@ mod tests {
             rev,
             Rev::Parent(Box::new(Rev::Parent(Box::new(Rev::Refname(Refname::Head))))),
         );
+    }
 
+    #[test]
+    fn ancestors() {
         let ancestors = ["HEAD~1", "HEAD~2", "HEAD~3", "HEAD~1012123119"];
         for rev in ancestors {
             dbg!(rev);
             let rev = Rev::parse(rev).unwrap();
             assert!(matches!(rev, Rev::Ancestor(_, _)));
         }
+    }
 
+    #[test]
+    fn complex() {
         let complex = "HEAD~12^^~2";
         let rev = Rev::parse(complex).unwrap();
         assert_eq!(
@@ -157,12 +177,31 @@ mod tests {
                 2
             )
         );
+    }
 
-        let invalid = ["HEAD~", "HEAD~-1", "HEAD~^", "HEA\0D", "HEAD^2"];
+    #[test]
+    fn invalid() {
+        let invalid = [
+            "HEAD~",
+            "HEAD~-1",
+            "HEAD~^",
+            "mast\0er",
+            "HEAD^2",
+            "HEAD~99999999999999999999999999999999999999999999999999",
+        ];
 
         for rev in invalid {
             dbg!(rev);
             assert!(Rev::parse(rev).is_err());
+        }
+    }
+    #[test]
+    fn book() {
+        let book_testcases = ["@^", "HEAD~42", "master^^", "abc123~3"];
+
+        for rev in book_testcases {
+            dbg!(rev);
+            assert!(Rev::parse(rev).is_ok());
         }
     }
 }
