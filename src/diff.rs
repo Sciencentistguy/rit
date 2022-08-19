@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 /// Compute the difference between two slices of strings, using the Myers diff algorithm
-pub fn diff<'a>(a: &[&'a str], b: &[&'a str]) -> Vec<Edit<'a>> {
-    let myers = Myers { a, b };
+pub fn diff<'a>(b: &[&'a str], a: &[&'a str]) -> Vec<Edit<'a>> {
+    let myers = Myers { b, a };
     myers.diff()
 }
 
@@ -28,6 +28,17 @@ pub struct Edit<'a> {
 impl<'a> Edit<'a> {
     fn new(kind: EditKind, line: &'a str) -> Self {
         Edit { kind, line }
+    }
+}
+
+impl Display for Edit<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let char = match self.kind {
+            EditKind::Insert => '+',
+            EditKind::Delete => '-',
+            EditKind::Equal => ' ',
+        };
+        write!(f, "{}{}", char, self.line)
     }
 }
 

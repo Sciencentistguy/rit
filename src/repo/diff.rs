@@ -28,8 +28,8 @@ impl super::Repo {
             for (path, change) in changes {
                 match change {
                     Change::IndexModified | Change::IndexAdded | Change::IndexRemoved => {
-                        let a = DiffTarget::from_head(path, tree);
-                        let b = DiffTarget::from_index(path, self);
+                        let a = DiffTarget::from_head(path, self, tree)?;
+                        let b = DiffTarget::from_index(path, self)?;
                         self.diff_files(a, b)?
                     }
                     _ => {}
@@ -40,7 +40,7 @@ impl super::Repo {
                 match change {
                     Change::Modified | Change::Removed => {
                         let a = DiffTarget::from_file(path)?;
-                        let b = DiffTarget::from_index(path, self);
+                        let b = DiffTarget::from_index(path, self)?;
                         self.diff_files(a, b)?
                     }
                     _ => {}
@@ -86,6 +86,22 @@ impl super::Repo {
         }
         println!("--- {}", a.path());
         println!("+++ {}", b.path());
+
+        let a = std::str::from_utf8(a.data());
+        let b = std::str::from_utf8(b.data());
+
+        if a.is_err() || b.is_err() {
+            unimplemented!("invalid utf-8, assuming binary file, which is NYI")
+        }
+
+        let a = a.unwrap().lines().collect::<Vec<_>>();
+        let b = b.unwrap().lines().collect::<Vec<_>>();
+
+        let edits = crate::diff::diff(&a, &b);
+
+        for edit in edits {
+            println!("{}", edit);
+        }
     }
 }
 
@@ -95,6 +111,7 @@ enum DiffTarget {
         oid: Digest,
         mode: FileMode,
         path: Utf8PathBuf,
+        data: Vec<u8>,
     },
 }
 
@@ -112,32 +129,47 @@ impl DiffTarget {
             let oid = blob.oid(&formatted);
             let mode = FileMode::from(&Repo::stat_file(path)?.unwrap());
             let path = Utf8Path::new("b").join(path);
-            Ok(Self::Modified { oid, mode, path })
+            Ok(Self::Modified {
+                oid,
+                mode,
+                path,
+                data: blob.into_data(),
+            })
         }
     }
 
-    fn from_index(path: &Utf8Path, repo: &Repo) -> Self {
+    fn from_index(path: &Utf8Path, repo: &Repo) -> Result<Self> {
         let entry = match repo.index.get_entry_by_path(path) {
             Some(x) => x,
-            None => return Self::Removed,
+            None => return Ok(Self::Removed),
         };
-        Self::from_entry(path, entry)
+        Self::from_entry(path, repo, entry)
     }
 
-    fn from_head(path: &Utf8Path, tree: &Tree) -> Self {
+    fn from_head(path: &Utf8Path, repo: &Repo, tree: &Tree) -> Result<Self> {
         let entry = match tree.get_entry(path.as_str()) {
             Some(x) => x,
-            None => return Self::Removed,
+            None => return Ok(Self::Removed),
         };
-        Self::from_entry(path, entry)
+        Self::from_entry(path, repo, entry)
     }
 
-    fn from_entry(path: &Utf8Path, entry: &IndexEntry) -> Self {
+    fn from_entry(path: &Utf8Path, repo: &Repo, entry: &IndexEntry) -> Result<Self> {
         let oid = entry.oid().clone();
         let mode = entry.mode();
         let path = Utf8Path::new("a").join(path);
+        let blob = repo
+            .database
+            .load(&oid)?
+            .into_blob()
+            .expect("file oid should be blob");
 
-        Self::Modified { oid, mode, path }
+        Ok(Self::Modified {
+            oid,
+            mode,
+            path,
+            data: blob.into_data(),
+        })
     }
 
     fn oid(&self) -> &Digest {
@@ -158,6 +190,13 @@ impl DiffTarget {
         match self {
             DiffTarget::Removed => None,
             DiffTarget::Modified { mode, .. } => Some(*mode),
+        }
+    }
+
+    fn data(&self) -> &[u8] {
+        match self {
+            DiffTarget::Removed => &[],
+            DiffTarget::Modified { data, .. } => data,
         }
     }
 
