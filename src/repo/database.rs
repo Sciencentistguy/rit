@@ -77,8 +77,13 @@ impl Database {
         self.object_path(oid).exists()
     }
 
+    pub fn contains(&self, oid: &Digest) -> bool {
+        let object_path = self.object_path(oid);
+        object_path.exists()
+    }
+
     pub fn read_to_vec(&self, oid: &Digest) -> Result<Vec<u8>> {
-        trace!(object=%oid.to_hex(), "Reading object from database");
+        trace!(object=%oid.to_hex(), "reading object from database");
 
         let object_path = self.object_path(oid);
 

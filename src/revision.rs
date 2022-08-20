@@ -7,7 +7,7 @@
 
 use std::str::FromStr;
 
-use crate::{digest::Digest, Result};
+use crate::{digest::Digest, repo::Repo, Result};
 
 use color_eyre::eyre::{eyre, Context};
 /// Contains all characters that cannot appear in a ref name.
@@ -80,6 +80,73 @@ impl Rev {
         // else...
         Ok(Rev::Refname(Refname::parse(input)?))
     }
+
+    fn resolve(self, repo: &Repo) -> Result<Option<Digest>> {
+        match self {
+            Rev::Refname(refname) => refname.resolve(repo),
+
+            Rev::Parent(rev) => {
+                let intermediary = match rev.resolve(repo)? {
+                    Some(x) => x,
+                    None => return Ok(None),
+                };
+
+                let commit = repo
+                    .database
+                    .load(&intermediary)?
+                    .into_commit()
+                    .ok_or_else(|| eyre!("Ref pointed to something other than a commit"))?;
+
+                let parent = match commit.parents().first() {
+                    Some(x) => x,
+                    None => return Ok(None),
+                };
+
+                Refname::Sha1(parent.clone()).resolve(repo)
+            }
+
+            Rev::Ancestor(rev, 0) => rev.resolve(repo),
+
+            Rev::Ancestor(rev, mut depth) => {
+                let intermediary = match rev.resolve(repo)? {
+                    Some(x) => x,
+                    None => return Ok(None),
+                };
+
+                let mut commit = repo
+                    .database
+                    .load(&intermediary)?
+                    .into_commit()
+                    .ok_or_else(|| eyre!("Ref pointed to something other than a commit"))?;
+
+                let mut parent = match commit.parents().first() {
+                    Some(x) => x,
+                    None => return Ok(None),
+                };
+
+                depth -= 1;
+
+                while depth > 0 {
+                    commit = repo
+                        .database
+                        .load(parent)?
+                        .into_commit()
+                        .ok_or_else(|| eyre!("Ref pointed to something other than a commit"))?;
+
+                    parent = match commit.parents().first() {
+                        Some(x) => x,
+                        None => return Ok(None),
+                    };
+
+                    depth -= 1;
+                }
+
+                assert_eq!(depth, 0);
+
+                Refname::Sha1(parent.clone()).resolve(repo)
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -105,10 +172,41 @@ impl Refname {
 
         Ok(Self::BranchTag(input.to_owned()))
     }
+
+    pub fn resolve(&self, repo: &Repo) -> Result<Option<Digest>> {
+        dbg!(self);
+        match self {
+            Refname::Head => {
+                let oid = match repo.read_head()? {
+                    Some(x) => x,
+                    None => return Ok(None),
+                };
+
+                Ok(Some(oid))
+            }
+
+            Refname::Sha1(oid) => {
+                if repo.database.contains(oid) {
+                    Ok(Some(oid.clone()))
+                } else {
+                    Ok(None)
+                }
+            }
+
+            Refname::BranchTag(name) => {
+                let oid = match repo.read_ref(name)? {
+                    Some(x) => x,
+                    None => return Ok(None),
+                };
+
+                Ok(Some(oid))
+            }
+        }
+    }
 }
 
 #[cfg(test)]
-mod tests {
+mod parser_tests {
     use super::*;
 
     #[test]
@@ -203,5 +301,117 @@ mod tests {
             dbg!(rev);
             assert!(Rev::parse(rev).is_ok());
         }
+    }
+}
+
+#[cfg(test)]
+mod evaluator_tests {
+    use camino::Utf8Path;
+    use tempdir::TempDir;
+
+    use crate::test::{COMMIT_EMAIL, COMMIT_NAME};
+
+    use super::*;
+
+    fn init_repo(dir: &Utf8Path) -> Result<Repo> {
+        std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
+        std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
+
+        Repo::init(dir)?;
+
+        crate::create_test_files!(dir, ["file0"]);
+
+        let mut repo = Repo::open(dir.to_owned())?;
+        repo.add_all()?;
+        repo.commit("zero")?;
+        crate::create_test_files!(dir, ["file1"]);
+        repo.add_all()?;
+        repo.commit("one")?;
+        crate::create_test_files!(dir, ["file2"]);
+        repo.add_all()?;
+        repo.commit("two")?;
+        crate::create_test_files!(dir, ["file3"]);
+        repo.add_all()?;
+        repo.commit("three")?;
+        crate::create_test_files!(dir, ["file4"]);
+        repo.add_all()?;
+        dbg!(repo.commit("four")?);
+
+        repo.create_branch("master")?;
+
+        Ok(repo)
+    }
+
+    #[test]
+    fn works() -> Result<()> {
+        let dir = TempDir::new("")?;
+        let dir = dir.path();
+        let dir = Utf8Path::from_path(dir).unwrap();
+
+        let repo = init_repo(dir)?;
+
+        let rev = Rev::parse("HEAD")?;
+        let oid = rev.resolve(&repo)?.unwrap();
+        let commit = repo.database.load(&oid)?.into_commit().unwrap();
+        assert_eq!(commit.message(), "four");
+
+        let three_oid = commit.parents().first().unwrap();
+        let rev = Rev::parse(&three_oid.to_hex())?;
+        let oid = rev.resolve(&repo)?.unwrap();
+        let commit = repo.database.load(&oid)?.into_commit().unwrap();
+        assert_eq!(commit.message(), "three");
+
+        let rev = Rev::parse("HEAD^")?;
+        let oid = rev.resolve(&repo)?.unwrap();
+        let commit = repo.database.load(&oid)?.into_commit().unwrap();
+        assert_eq!(commit.message(), "three");
+
+        let rev = Rev::parse("HEAD^^")?;
+        let oid = rev.resolve(&repo)?.unwrap();
+        let commit = repo.database.load(&oid)?.into_commit().unwrap();
+        assert_eq!(commit.message(), "two");
+
+        let rev = Rev::parse("HEAD~0")?;
+        let oid = rev.resolve(&repo)?.unwrap();
+        let commit = repo.database.load(&oid)?.into_commit().unwrap();
+        assert_eq!(commit.message(), "four");
+
+        let rev = Rev::parse("HEAD~1")?;
+        let oid = rev.resolve(&repo)?.unwrap();
+        let commit = repo.database.load(&oid)?.into_commit().unwrap();
+        assert_eq!(commit.message(), "three");
+
+        let rev = Rev::parse("HEAD~2")?;
+        let oid = rev.resolve(&repo)?.unwrap();
+        let commit = repo.database.load(&oid)?.into_commit().unwrap();
+        assert_eq!(commit.message(), "two");
+
+        let rev = Rev::parse("HEAD~3")?;
+        let oid = rev.resolve(&repo)?.unwrap();
+        let commit = repo.database.load(&oid)?.into_commit().unwrap();
+        assert_eq!(commit.message(), "one");
+
+        let rev = Rev::parse("HEAD~4")?;
+        let oid = rev.resolve(&repo)?.unwrap();
+        let commit = repo.database.load(&oid)?.into_commit().unwrap();
+        assert_eq!(commit.message(), "zero");
+
+        let rev = Rev::parse("HEAD~5")?;
+        assert_eq!(rev.resolve(&repo)?, None);
+
+        let null = Digest::NULL_DIGEST;
+        let rev = Rev::parse(&null.to_hex())?;
+        assert_eq!(rev.resolve(&repo)?, None);
+
+        let rev = Rev::parse("master")?;
+        let oid = rev.resolve(&repo)?.unwrap();
+        dbg!(&oid);
+        let commit = repo.database.load(&oid)?.into_commit().unwrap();
+        assert_eq!(commit.message(), "four");
+
+        let rev = Rev::parse("main")?;
+        assert_eq!(rev.resolve(&repo)?, None);
+
+        Ok(())
     }
 }

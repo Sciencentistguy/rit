@@ -1,12 +1,13 @@
 use std::fs::File;
 use std::io::Write;
+use std::str::FromStr;
 
-use camino::Utf8Path;
+use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 
 use crate::digest::Digest;
-use crate::Result;
 use crate::revision::is_valid_ref_name;
+use crate::Result;
 
 impl super::Repo {
     /// Updates the value of HEAD to oid
@@ -28,7 +29,7 @@ impl super::Repo {
         self.update_ref_file(&path, &self.read_head()?.unwrap())
     }
 
-    /// Set the value of a ref file to the specified oid. 
+    /// Set the value of a ref file to the specified oid.
     ///
     /// This function does not use git locks. This is a design decision. This creates a possible
     /// issue when multiple processes (realistically, git and rit) are contending a head file. The
@@ -38,5 +39,37 @@ impl super::Repo {
         let mut file = File::create(path)?;
         writeln!(&mut file, "{oid:x}")?;
         Ok(())
+    }
+
+    pub fn read_ref(&self, name: &str) -> Result<Option<Digest>> {
+        let path = match self.path_for_ref(name) {
+            Some(x) => x,
+            None => return Ok(None),
+        };
+
+        let string = std::fs::read_to_string(path)?;
+        let string = string.trim();
+        dbg!(string);
+        let oid = Digest::from_str(string)?;
+
+        Ok(Some(oid))
+    }
+
+    fn path_for_ref(&self, name: &str) -> Option<Utf8PathBuf> {
+        if name == "HEAD" {
+            return Some(self.head_path.clone());
+        }
+
+        let x = self.refs_path.join(name);
+        if x.exists() {
+            return Some(x);
+        }
+
+        let x = self.heads_path.join(name);
+        if x.exists() {
+            return Some(x);
+        }
+
+        None
     }
 }

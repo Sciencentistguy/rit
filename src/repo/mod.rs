@@ -68,7 +68,7 @@ impl Repo {
         if git_dir.exists() {
             warn!("Repo already exists, init will do nothing");
         } else {
-            for d in ["objects", "refs"] {
+            for d in ["objects", "refs", "refs/heads"] {
                 let dir = git_dir.join(d);
                 trace!(path=?dir, "Creating directory");
                 std::fs::create_dir_all(dir)?;
