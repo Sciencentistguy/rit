@@ -42,17 +42,42 @@ impl super::Repo {
     }
 
     pub fn read_ref(&self, name: &str) -> Result<Option<Digest>> {
-        let path = match self.path_for_ref(name) {
-            Some(x) => x,
-            None => return Ok(None),
-        };
+        if let Some(path) = self.path_for_ref(name) {
+            let string = std::fs::read_to_string(path)?;
+            let string = string.trim();
+            dbg!(string);
+            let oid = Digest::from_str(string)?;
 
-        let string = std::fs::read_to_string(path)?;
-        let string = string.trim();
-        dbg!(string);
-        let oid = Digest::from_str(string)?;
+            return Ok(Some(oid));
+        }
 
-        Ok(Some(oid))
+        if !name.chars().all(|c| c.is_ascii_hexdigit()) {
+            // Definitely not an oid fragment
+            return Ok(None);
+        }
+
+        let mut candidates = self.database.prefix_match(name)?;
+
+        match candidates.len() {
+            0 => Ok(None),
+            1 => {
+                let oid = candidates.pop().unwrap();
+                if self.database.load(&oid)?.is_commit() {
+                    Ok(Some(oid))
+                } else {
+                    Err(eyre!("Refname was valid sha1 fragment, but pointed to something other than a commit"))
+                }
+            }
+            _ => {
+                eprintln!("Too many candidates for prefix {}:", name);
+
+                for candidate in candidates {
+                    eprintln!("\t{:x}", candidate);
+                }
+
+                Err(eyre!("Too many candidates for prefix {}:", name))
+            }
+        }
     }
 
     fn path_for_ref(&self, name: &str) -> Option<Utf8PathBuf> {

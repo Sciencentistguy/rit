@@ -187,7 +187,11 @@ impl Refname {
 
             Refname::Sha1(oid) => {
                 if repo.database.contains(oid) {
-                    Ok(Some(oid.clone()))
+                    if repo.database.load(oid)?.is_commit() {
+                        Ok(Some(oid.clone()))
+                    } else {
+                        Err(eyre!("Refname was a valid sha1, but pointed to something other than a commit"))
+                    }
                 } else {
                     Ok(None)
                 }
@@ -355,8 +359,20 @@ mod evaluator_tests {
         let commit = repo.database.load(&oid)?.into_commit().unwrap();
         assert_eq!(commit.message(), "four");
 
+        let tid = commit.tree_id().clone();
+        let tid = tid.to_hex();
+        let rev = Rev::parse(&tid)?;
+        assert!(rev.resolve(&repo).is_err());
+
         let three_oid = commit.parents().first().unwrap();
-        let rev = Rev::parse(&three_oid.to_hex())?;
+        let three_oid = three_oid.to_hex();
+        let rev = Rev::parse(&three_oid)?;
+        let oid = rev.resolve(&repo)?.unwrap();
+        let commit = repo.database.load(&oid)?.into_commit().unwrap();
+        assert_eq!(commit.message(), "three");
+
+        let three_oid_frag = &three_oid[..6];
+        let rev = Rev::parse(three_oid_frag)?;
         let oid = rev.resolve(&repo)?.unwrap();
         let commit = repo.database.load(&oid)?.into_commit().unwrap();
         assert_eq!(commit.message(), "three");
