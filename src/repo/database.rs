@@ -79,10 +79,9 @@ impl Database {
             return None;
         }
         let mut x = self.database_root.to_owned();
-        let (prefix, suffix) = prefix.split_at(2);
+        let prefix = &prefix[..2];
         debug_assert_eq!(prefix.len(), 2);
         x.push(prefix);
-        // x.push(suffix);
         Some(x)
     }
 
@@ -154,7 +153,7 @@ impl Database {
         };
 
         if !dirname.exists() {
-            return Ok(Vec::new())
+            return Ok(Vec::new());
         }
 
         let mut candidates = Vec::new();

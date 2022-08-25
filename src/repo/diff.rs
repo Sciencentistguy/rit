@@ -12,8 +12,13 @@ use super::{
     Repo,
 };
 
+pub enum DiffMode {
+    WorktreeIndex,
+    IndexHead,
+}
+
 impl super::Repo {
-    pub fn diff(&self, cached: bool) -> Result<()> {
+    pub fn diff(&self, mode: DiffMode) -> Result<()> {
         let status = match Status::new(self)? {
             Some(x) => x,
             None => return Ok(()),
@@ -23,28 +28,31 @@ impl super::Repo {
             .get_statuses()?
             .tap_mut(|v| v.sort_unstable_by_key(|x| x.0));
 
-        if cached {
-            let tree = status.tree();
-
-            for (path, change) in changes {
-                match change {
-                    Change::IndexModified | Change::IndexAdded | Change::IndexRemoved => {
-                        let a = DiffTarget::from_index(path, self)?;
-                        let b = DiffTarget::from_head(path, self, tree)?;
-                        self.diff_files(a, b)?
+        match mode {
+            DiffMode::WorktreeIndex => {
+                for (path, change) in changes {
+                    match change {
+                        Change::Modified | Change::Removed => {
+                            let a = DiffTarget::from_file(path)?;
+                            let b = DiffTarget::from_index(path, self)?;
+                            self.diff_files(a, b)?
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
-        } else {
-            for (path, change) in changes {
-                match change {
-                    Change::Modified | Change::Removed => {
-                        let a = DiffTarget::from_file(path)?;
-                        let b = DiffTarget::from_index(path, self)?;
-                        self.diff_files(a, b)?
+            DiffMode::IndexHead => {
+                let tree = status.tree();
+
+                for (path, change) in changes {
+                    match change {
+                        Change::IndexModified | Change::IndexAdded | Change::IndexRemoved => {
+                            let a = DiffTarget::from_index(path, self)?;
+                            let b = DiffTarget::from_head(path, self, tree)?;
+                            self.diff_files(a, b)?
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
         }

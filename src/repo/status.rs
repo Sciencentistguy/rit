@@ -13,8 +13,13 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use super::Repo;
 
+pub enum StatusOutputMode {
+    Long,
+    Porcelain,
+}
+
 impl super::Repo {
-    pub fn status(&self, long: bool) -> Result<()> {
+    pub fn status(&self, mode: StatusOutputMode) -> Result<()> {
         let status = match Status::new(self)? {
             Some(x) => x,
             None => return Ok(()),
@@ -24,10 +29,9 @@ impl super::Repo {
             .get_statuses()?
             .tap_mut(|v| v.sort_unstable_by_key(|x| x.0));
 
-        if long {
-            print_long_status(&statuses)?;
-        } else {
-            print_porcelain_status(&statuses);
+        match mode {
+            StatusOutputMode::Long => print_long_status(&statuses)?,
+            StatusOutputMode::Porcelain => print_porcelain_status(&statuses),
         }
 
         Ok(())

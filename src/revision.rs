@@ -3,13 +3,14 @@
 //! `<rev>` = `<rev>^`
 //! `<rev>` = `<rev>~<num>`
 //! `<num>` = a natural number
-//! `<refname>` = <branchname> | <sha1> | HEAD
+//! `<refname>` = a branch name | a sha1 hash | "HEAD" or '@'
 
 use std::str::FromStr;
 
 use crate::{digest::Digest, repo::Repo, Result};
 
 use color_eyre::eyre::{eyre, Context};
+
 /// Contains all characters that cannot appear in a ref name.
 ///
 /// In git, the character `'*'` is allowed in ref names if the environment variable

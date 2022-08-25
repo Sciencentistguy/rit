@@ -20,7 +20,9 @@ mod util;
 use camino::Utf8PathBuf;
 use color_eyre::eyre::Context;
 pub use color_eyre::Result;
-use tracing::Level;
+use repo::diff::DiffMode;
+use repo::status::StatusOutputMode;
+use tracing::{info, Level};
 use tracing_subscriber::fmt::Subscriber;
 use tracing_subscriber::EnvFilter;
 
@@ -49,13 +51,15 @@ fn main() -> Result<()> {
                 .with_max_level(Level::INFO)
                 .finish();
             tracing::subscriber::set_global_default(subscriber)?;
+            info!("Verbosity level: INFO (1)");
         }
-        _ => {
+        x => {
             let subscriber = Subscriber::builder()
                 .with_env_filter(EnvFilter::from_default_env())
                 .with_max_level(Level::TRACE)
                 .finish();
             tracing::subscriber::set_global_default(subscriber)?;
+            info!("Verbosity level: TRACE ({x})");
         }
     };
 
@@ -101,11 +105,22 @@ fn main() -> Result<()> {
         Command::CatFile(args) => cat_file::handle(&mut repo, args)?,
 
         Command::Status { porcelain, long } => {
-            let long = (!porcelain) || *long;
-            repo.status(long)?
+            let mode = if !porcelain || *long {
+                StatusOutputMode::Long
+            } else {
+                StatusOutputMode::Porcelain
+            };
+            repo.status(mode)?
         }
 
-        Command::Diff { cached } => repo.diff(*cached)?,
+        Command::Diff { cached } => {
+            let mode = if *cached {
+                DiffMode::IndexHead
+            } else {
+                DiffMode::WorktreeIndex
+            };
+            repo.diff(mode)?
+        }
 
         Command::ShowHead { oid } => repo.show_head(oid.clone())?,
 

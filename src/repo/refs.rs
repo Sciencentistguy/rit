@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
+use tracing::trace;
 
 use crate::digest::Digest;
 use crate::revision::is_valid_ref_name;
@@ -35,7 +36,7 @@ impl super::Repo {
     /// issue when multiple processes (realistically, git and rit) are contending a head file. The
     /// solution to this is to Just Not run rit while a git process is running.
     fn update_ref_file(&self, path: &Utf8Path, oid: &Digest) -> Result<()> {
-        dbg!(path);
+        trace!(%path, ?oid, "Updating ref");
         let mut file = File::create(path)?;
         writeln!(&mut file, "{oid:x}")?;
         Ok(())
@@ -65,7 +66,7 @@ impl super::Repo {
                 if self.database.load(&oid)?.is_commit() {
                     Ok(Some(oid))
                 } else {
-                    Err(eyre!("Refname was valid sha1 fragment, but pointed to something other than a commit"))
+                    Err(eyre!("Refname was a valid sha1 fragment, but pointed to something other than a commit"))
                 }
             }
             _ => {

@@ -2,7 +2,7 @@ mod add;
 mod branch;
 mod commit;
 pub mod database;
-mod diff;
+pub mod diff;
 mod head;
 mod ignore;
 mod refs;
