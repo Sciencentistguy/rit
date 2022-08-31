@@ -204,7 +204,7 @@ impl DiffTarget {
 
     fn oid(&self) -> &Digest {
         match self {
-            DiffTarget::Removed => &Digest::NULL_DIGEST,
+            DiffTarget::Removed => &Digest::NULL,
             DiffTarget::Modified { oid, .. } => oid,
         }
     }

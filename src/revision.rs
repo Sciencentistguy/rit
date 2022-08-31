@@ -416,7 +416,7 @@ mod evaluator_tests {
         let rev = Rev::parse("HEAD~5")?;
         assert_eq!(rev.resolve(&repo)?, None);
 
-        let null = Digest::NULL_DIGEST;
+        let null = Digest::NULL;
         let rev = Rev::parse(&null.to_hex())?;
         assert_eq!(rev.resolve(&repo)?, None);
 
