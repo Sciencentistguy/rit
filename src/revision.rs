@@ -14,9 +14,10 @@ use color_eyre::eyre::{eyre, Context};
 /// Contains all characters that cannot appear in a ref name.
 ///
 /// In git, the character `'*'` is allowed in ref names if the environment variable
-/// `REFNAME_REFSPEC_PATTERN` is set. Rit does not allow this, so `'*'` appears in this array.
+/// `REFNAME_REFSPEC_PATTERN` is set. This feature is currently unsupported, and such `'*'` is a
+/// disallowed character.
 ///
-/// Also, Git uses C-Strings; the character `'\0'` denotes the end of a ref name ref nams. We
+/// Also, Git uses C-Strings; the character `'\0'` denotes the end of a ref name. We
 /// disallow it entirely.
 ///
 /// See: <https://github.com/git/git/blob/795ea8776befc95ea2becd8020c7a284677b4161/refs.c#L48-L57>
@@ -29,16 +30,12 @@ const DISALLOWED_CHARACTERS: [char; 41] = [
 
 /// Check whether a string is a valid ref name.
 ///
-/// This is not a port of `check_refname_component` from git's `refs.c`, but is based on the documentation for
-/// that function.
-///
 /// Disallowed paths are any path where:
-///
 /// - it (or any path component) begins with `'.'`
 /// - it contains double dots `".."`
 /// - it contains ASCII control characters
-/// - it contains ':', '?', '[', '\', '^', '~', SP, or TAB anywhere
-/// - it contains `'*'`
+/// - it contains `':'`, `'?'`, `'['`, `'\\'`, `'^'`, `'~'`, `' '`, or `'\t'`
+/// - it contains `'*'` (unless `REFNAME_REFSPEC_PATTERN` is set) [unsupported]
 /// - it ends with `'/'`
 /// - it ends with `".lock"`
 /// - it contains `"@{"`
@@ -55,98 +52,76 @@ pub fn is_valid_ref_name(name: &str) -> bool {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Rev {
-    Refname(Refname),
-    Parent(Box<Rev>),
-    Ancestor(Box<Rev>, u64),
+struct Rev {
+    refname: Refname,
+    distance: u64,
 }
 
 impl Rev {
-    fn parse(input: &str) -> Result<Self> {
-        if let Some(rev) = input.strip_suffix('^') {
-            let rev = Self::parse(rev)?;
-            return Ok(Rev::Parent(Box::new(rev)));
+    fn parse(mut input: &str) -> Result<Self> {
+        let mut distance = 0;
+        loop {
+            if input.ends_with('^') {
+                distance += 1;
+                input = &input[..input.len() - 1];
+            } else if let Some(idx) = input.rfind('~') {
+                distance += input[idx + 1..]
+                    .parse::<u64>()
+                    .wrap_err(eyre!("A number is required after '~'"))?;
+                input = &input[..idx];
+            } else {
+                let refname = Refname::parse(input)?;
+                break Ok(Rev { refname, distance });
+            }
         }
-
-        if let Some(idx) = input.rfind('~') {
-            let distance = &input[idx + 1..];
-            let distance = distance
-                .parse::<u64>()
-                .wrap_err(eyre!("A number is required after '~'"))?;
-
-            let rev = Self::parse(&input[..idx])?;
-            return Ok(Rev::Ancestor(Box::new(rev), distance));
-        }
-
-        // else...
-        Ok(Rev::Refname(Refname::parse(input)?))
     }
 
     fn resolve(self, repo: &Repo) -> Result<Option<Digest>> {
-        match self {
-            Rev::Refname(refname) => refname.resolve(repo),
+        let Self {
+            refname,
+            mut distance,
+        } = self;
 
-            Rev::Parent(rev) => {
-                let intermediary = match rev.resolve(repo)? {
-                    Some(x) => x,
-                    None => return Ok(None),
-                };
-
-                let commit = repo
-                    .database
-                    .load(&intermediary)?
-                    .into_commit()
-                    .ok_or_else(|| eyre!("Ref pointed to something other than a commit"))?;
-
-                let parent = match commit.parents().first() {
-                    Some(x) => x,
-                    None => return Ok(None),
-                };
-
-                Refname::Sha1(parent.clone()).resolve(repo)
-            }
-
-            Rev::Ancestor(rev, 0) => rev.resolve(repo),
-
-            Rev::Ancestor(rev, mut depth) => {
-                let intermediary = match rev.resolve(repo)? {
-                    Some(x) => x,
-                    None => return Ok(None),
-                };
-
-                let mut commit = repo
-                    .database
-                    .load(&intermediary)?
-                    .into_commit()
-                    .ok_or_else(|| eyre!("Ref pointed to something other than a commit"))?;
-
-                let mut parent = match commit.parents().first() {
-                    Some(x) => x,
-                    None => return Ok(None),
-                };
-
-                depth -= 1;
-
-                while depth > 0 {
-                    commit = repo
-                        .database
-                        .load(parent)?
-                        .into_commit()
-                        .ok_or_else(|| eyre!("Ref pointed to something other than a commit"))?;
-
-                    parent = match commit.parents().first() {
-                        Some(x) => x,
-                        None => return Ok(None),
-                    };
-
-                    depth -= 1;
-                }
-
-                assert_eq!(depth, 0);
-
-                Refname::Sha1(parent.clone()).resolve(repo)
-            }
+        if distance == 0 {
+            return refname.resolve(repo);
         }
+
+        let intermediary = match refname.resolve(repo)? {
+            Some(x) => x,
+            None => return Ok(None),
+        };
+
+        let mut commit = repo
+            .database
+            .load(&intermediary)?
+            .into_commit()
+            .ok_or_else(|| eyre!("Ref pointed to something other than a commit"))?;
+
+        let mut parent = match commit.parents().first() {
+            Some(x) => x,
+            None => return Ok(None),
+        };
+
+        distance -= 1;
+
+        while distance > 0 {
+            commit = repo
+                .database
+                .load(parent)?
+                .into_commit()
+                .ok_or_else(|| eyre!("Ref pointed to something other than a commit"))?;
+
+            parent = match commit.parents().first() {
+                Some(x) => x,
+                None => return Ok(None),
+            };
+
+            distance -= 1;
+        }
+
+        assert_eq!(distance, 0);
+
+        Refname::Sha1(parent.clone()).resolve(repo)
     }
 }
 
@@ -218,7 +193,7 @@ mod parser_tests {
     fn head() {
         let rev = "HEAD";
         let rev = Rev::parse(rev).unwrap();
-        assert_eq!(rev, Rev::Refname(Refname::Head));
+        assert_eq!(rev.refname, Refname::Head);
     }
 
     #[test]
@@ -226,7 +201,7 @@ mod parser_tests {
         let rev = "ffc1c862714edb677d6f467902cf2e406eee22ce";
         let rev = Rev::parse(rev).unwrap();
         let dig = Digest::from_str("ffc1c862714edb677d6f467902cf2e406eee22ce").unwrap();
-        assert_eq!(rev, Rev::Refname(Refname::Sha1(dig)));
+        assert_eq!(rev.refname, Refname::Sha1(dig));
     }
 
     #[test]
@@ -235,51 +210,68 @@ mod parser_tests {
         for name in branch_tag {
             dbg!(name);
             let rev = Rev::parse(name).unwrap();
-            assert_eq!(rev, Rev::Refname(Refname::BranchTag(name.to_owned())));
+            assert_eq!(rev.refname, Refname::BranchTag(name.to_owned()));
         }
     }
 
     #[test]
     fn parents() {
         let parents = ["HEAD^", "HEAD^^"];
+        let expected = [
+            Rev {
+                refname: Refname::Head,
+                distance: 1,
+            },
+            Rev {
+                refname: Refname::Head,
+                distance: 2,
+            },
+        ];
 
-        for rev in parents {
+        for (rev, expected) in parents.into_iter().zip(expected) {
             dbg!(&rev);
             let rev = Rev::parse(rev).unwrap();
-            assert!(matches!(rev, Rev::Parent(_)));
+            assert_eq!(rev, expected);
         }
-
-        let rev = Rev::parse(parents[1]).unwrap();
-        assert_eq!(
-            rev,
-            Rev::Parent(Box::new(Rev::Parent(Box::new(Rev::Refname(Refname::Head))))),
-        );
     }
 
     #[test]
     fn ancestors() {
         let ancestors = ["HEAD~1", "HEAD~2", "HEAD~3", "HEAD~1012123119"];
-        for rev in ancestors {
-            dbg!(rev);
+        let expected = [
+            Rev {
+                refname: Refname::Head,
+                distance: 1,
+            },
+            Rev {
+                refname: Refname::Head,
+                distance: 2,
+            },
+            Rev {
+                refname: Refname::Head,
+                distance: 3,
+            },
+            Rev {
+                refname: Refname::Head,
+                distance: 1012123119,
+            },
+        ];
+        for (rev, expected) in ancestors.into_iter().zip(expected) {
+            dbg!(&rev);
             let rev = Rev::parse(rev).unwrap();
-            assert!(matches!(rev, Rev::Ancestor(_, _)));
+            assert_eq!(rev, expected);
         }
     }
 
     #[test]
     fn complex() {
         let complex = "HEAD~12^^~2";
+        let expected = Rev {
+            refname: Refname::Head,
+            distance: 16,
+        };
         let rev = Rev::parse(complex).unwrap();
-        assert_eq!(
-            rev,
-            Rev::Ancestor(
-                Box::new(Rev::Parent(Box::new(Rev::Parent(Box::new(Rev::Ancestor(
-                    Box::new(Rev::Refname(Refname::Head)),
-                    12,
-                )))))),
-                2
-            )
-        );
+        assert_eq!(rev, expected,);
     }
 
     #[test]
@@ -301,10 +293,29 @@ mod parser_tests {
     #[test]
     fn book() {
         let book_testcases = ["@^", "HEAD~42", "master^^", "abc123~3"];
+        let expected = [
+            Rev {
+                refname: Refname::Head,
+                distance: 1,
+            },
+            Rev {
+                refname: Refname::Head,
+                distance: 42,
+            },
+            Rev {
+                refname: Refname::BranchTag("master".to_owned()),
+                distance: 2,
+            },
+            Rev {
+                refname: Refname::BranchTag("abc123".to_owned()),
+                distance: 3,
+            },
+        ];
 
-        for rev in book_testcases {
-            dbg!(rev);
-            assert!(Rev::parse(rev).is_ok());
+        for (rev, expected) in book_testcases.into_iter().zip(expected) {
+            dbg!(&rev);
+            let rev = Rev::parse(rev).unwrap();
+            assert_eq!(rev, expected);
         }
     }
 }
