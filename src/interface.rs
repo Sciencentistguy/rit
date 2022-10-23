@@ -18,7 +18,7 @@ pub enum Command {
 
     /// Add file contents to the index
     Add {
-        #[clap(env = "RIT_ADD_PATH", multiple_values = true)]
+        #[clap(env = "RIT_ADD_PATH", num_args(0..))]
         paths: Vec<Utf8PathBuf>,
     },
 
