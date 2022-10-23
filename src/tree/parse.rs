@@ -42,7 +42,7 @@ impl super::TreeEntry {
 
         let (mode, line) = line.split_at(mode_len);
         let mode = str::from_utf8(mode)?.trim();
-        let mode = FileMode(u32::from_str_radix(mode, 8)?);
+        let mode = FileMode::from(u32::from_str_radix(mode, 8)?);
 
         let line = &line[1..];
         let name = unsafe {

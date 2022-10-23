@@ -28,7 +28,7 @@ impl TreeEntry {
     pub fn mode(&self) -> FileMode {
         match self {
             TreeEntry::File(f) => f.mode(),
-            TreeEntry::Directory { .. } => FileMode::DIRECTORY,
+            TreeEntry::Directory { .. } => FileMode::Directory,
             TreeEntry::IncompleteFile { mode, .. } => *mode,
         }
     }
