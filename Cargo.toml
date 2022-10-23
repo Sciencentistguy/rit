@@ -31,3 +31,7 @@ pretty_assertions = "1.3.0"
 tempdir = "0.3.7"
 
 [features]
+
+
+[profile.release]
+debug = true

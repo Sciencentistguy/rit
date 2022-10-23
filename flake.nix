@@ -52,6 +52,7 @@
             super.nativeBuildInputs
             ++ [
               cargo-edit
+              cargo-flamegraph
               clippy
               rustfmt
             ];

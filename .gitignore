@@ -1,3 +1,6 @@
 /target
 HEAD
 result
+
+flamegraph.svg
+perf.data*
