@@ -64,7 +64,7 @@ fn write_index_entry(
     out.extend_from_slice(&mtime_n.to_be_bytes());
     out.extend_from_slice(&dev.to_be_bytes());
     out.extend_from_slice(&ino.to_be_bytes());
-    out.extend_from_slice(&mode.to_be_bytes());
+    out.extend_from_slice(&mode.inner().to_be_bytes());
     out.extend_from_slice(&uid.to_be_bytes());
     out.extend_from_slice(&gid.to_be_bytes());
     out.extend_from_slice(&siz.to_be_bytes());

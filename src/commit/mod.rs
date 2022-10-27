@@ -2,6 +2,8 @@ mod parse;
 mod write;
 
 use crate::digest::Digest;
+use crate::repo::Repo;
+use crate::Result;
 
 struct GpgSig;
 
@@ -77,5 +79,27 @@ impl Commit {
 
     pub fn tree_id(&self) -> &Digest {
         &self.tree_id
+    }
+
+    pub fn parents(&self) -> &[Digest] {
+        self.parents.as_ref()
+    }
+
+    pub fn parent(&self, repo: &Repo) -> Result<Option<Commit>> {
+        let parent = match self.parents.first() {
+            Some(x) => x,
+            None => return Ok(None),
+        };
+        let parent = repo
+            .database
+            .load(parent)?
+            .into_commit()
+            .expect("The parent of a commit should be a commit");
+
+        Ok(Some(parent))
+    }
+
+    pub fn message(&self) -> &str {
+        self.message.as_ref()
     }
 }

@@ -1,78 +1,78 @@
-use std::ops::{Deref, DerefMut};
-
+use libc::mode_t;
 use tracing::warn;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct FileMode(pub u32);
+/// A file mode.
+///
+/// Rit only acknowledges the existence of 3 types of file mode (for now...):
+///  - regular files (0o100644)
+///  - executable files (0o100755)
+///  - directories (0o040000)
+///
+/// As fewer than 256 states are actually represented, we can save 3 bytes by not storing the whole
+/// mode as a `mode_t`. Ensure that
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FileMode {
+    Directory,
+    Executable,
+    Regular,
+}
 
 impl std::fmt::Octal for FileMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:o}", self.0)
-    }
-}
-
-impl std::fmt::Debug for FileMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "FileMode(0o{:o})", self.0)
+        write!(f, "{:o}", self.inner())
     }
 }
 
 impl FileMode {
-    pub const DIRECTORY: FileMode = FileMode(0o040000);
-    pub const EXECUTABLE: FileMode = FileMode(0o100755);
-    pub const REGULAR: FileMode = FileMode(0o100644);
+    const DIRECTORY: mode_t = 0o040000;
+    const EXECUTABLE: mode_t = 0o100755;
+    const REGULAR: mode_t = 0o100644;
 
-    #[cfg(target_os = "macos")]
-    pub fn is_executable(self) -> bool {
-        self.0 & libc::S_IXUSR as u32 != 0
+    pub fn inner(&self) -> mode_t {
+        match self {
+            FileMode::Directory => FileMode::DIRECTORY,
+            FileMode::Executable => FileMode::EXECUTABLE,
+            FileMode::Regular => FileMode::REGULAR,
+        }
     }
 
-    #[cfg(target_os = "linux")]
-    pub fn is_executable(self) -> bool {
-        self.0 & libc::S_IXUSR != 0
-    }
-}
-
-impl From<u32> for FileMode {
-    fn from(mode: u32) -> Self {
-        Self(mode)
-    }
-}
-
-impl Deref for FileMode {
-    type Target = u32;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    /// Returns `true` if the file mode is [`Executable`].
+    ///
+    /// [`Executable`]: FileMode::Executable
+    #[must_use]
+    pub fn is_executable(&self) -> bool {
+        matches!(self, Self::Executable)
     }
 }
 
-impl DerefMut for FileMode {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+impl From<mode_t> for FileMode {
+    fn from(native_mode: mode_t) -> Self {
+        match native_mode {
+            FileMode::DIRECTORY => FileMode::Directory,
+            FileMode::REGULAR => FileMode::Regular,
+            FileMode::EXECUTABLE => FileMode::Executable,
+            actual_mode => {
+                warn!(
+                    mode=?actual_mode,
+                    "Discarding information! Storing file with unsupported mode"
+                );
+                if actual_mode & libc::S_IXUSR != 0 {
+                    FileMode::Executable
+                } else {
+                    FileMode::Regular
+                }
+            }
+        }
     }
 }
 
 impl From<&libc::stat> for FileMode {
     fn from(stat: &libc::stat) -> Self {
-        #[cfg(target_os = "macos")]
-        let actual_mode = FileMode(stat.st_mode as u32);
-
-        #[cfg(target_os = "linux")]
-        let actual_mode = FileMode(stat.st_mode);
-
-        if actual_mode != FileMode::REGULAR && actual_mode != FileMode::EXECUTABLE {
-            warn!(
-                mode=?actual_mode,
-                "Discarding information! Storing file with unsupported mode"
-            );
-        }
-
-        if actual_mode.is_executable() {
-            FileMode::EXECUTABLE
-        } else {
-            FileMode::REGULAR
-        }
+        stat.st_mode.into()
     }
+}
+
+#[test]
+fn size() {
+    assert_eq!(std::mem::size_of::<FileMode>(), 1);
 }

@@ -73,7 +73,7 @@ fn parse_index_entry(offset: &mut usize, bytes: &[u8]) -> Result<IndexEntry> {
     let ino = u32::from_be_bytes(bytes[*offset..*offset + 4].try_into().unwrap());
     *offset += 4;
 
-    let mode = u32::from_be_bytes(bytes[*offset..*offset + 4].try_into().unwrap()).into();
+    let mode = libc::mode_t::from_be_bytes(bytes[*offset..*offset + 4].try_into().unwrap()).into();
     *offset += 4;
 
     let uid = u32::from_be_bytes(bytes[*offset..*offset + 4].try_into().unwrap());

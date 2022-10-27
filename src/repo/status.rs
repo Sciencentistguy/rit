@@ -4,16 +4,22 @@ use crate::tree::Tree;
 use crate::Result;
 use crate::{blob::Blob, tree::TreeEntry};
 
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, io::Write};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use rayon::prelude::*;
 use tap::Tap;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use super::Repo;
 
+pub enum StatusOutputMode {
+    Long,
+    Porcelain,
+}
+
 impl super::Repo {
-    pub fn status(&self) -> Result<()> {
+    pub fn status(&self, mode: StatusOutputMode) -> Result<()> {
         let status = match Status::new(self)? {
             Some(x) => x,
             None => return Ok(()),
@@ -23,11 +29,73 @@ impl super::Repo {
             .get_statuses()?
             .tap_mut(|v| v.sort_unstable_by_key(|x| x.0));
 
-        for (path, change) in statuses {
-            println!("{} {}", change, path);
+        match mode {
+            StatusOutputMode::Long => print_long_status(&statuses)?,
+            StatusOutputMode::Porcelain => print_porcelain_status(&statuses),
         }
 
         Ok(())
+    }
+}
+
+fn print_long_status(statuses: &[(&Utf8Path, Change)]) -> std::io::Result<()> {
+    let mut writer = StandardStream::stdout(ColorChoice::Auto);
+
+    let mut it = statuses.iter().filter(|x| x.1.is_index()).peekable();
+    if it.peek().is_some() {
+        writeln!(&mut writer, "Changes to be committed:")?;
+        writer.set_color(ColorSpec::new().set_fg(Some(Color::Green)))?;
+        for (path, status) in it {
+            let word = match status {
+                Change::IndexAdded => "new file",
+                Change::IndexRemoved => "deleted",
+                Change::IndexModified => "modified",
+                _ => unreachable!(),
+            };
+            writeln!(&mut writer, "\t{word}: {path}")?;
+        }
+        writer.reset()?;
+        writeln!(&mut writer)?;
+    }
+
+    let mut it = statuses.iter().filter(|x| !x.1.is_index()).peekable();
+    if it.peek().is_some() {
+        writeln!(&mut writer, "Changes not staged for commit:")?;
+        writer.set_color(ColorSpec::new().set_fg(Some(Color::Red)))?;
+        for (path, status) in it {
+            let word = match status {
+                Change::Untracked => continue,
+                Change::Removed => "deleted",
+                Change::Modified => "modified",
+                _ => unreachable!(),
+            };
+            writeln!(&mut writer, "\t{word}: {path}")?;
+        }
+        writer.reset()?;
+        writeln!(&mut writer)?;
+    }
+
+    let mut it = statuses
+        .iter()
+        .filter(|x| matches!(x.1, Change::Untracked))
+        .peekable();
+    if it.peek().is_some() {
+        writeln!(&mut writer, "Untracked files:")?;
+        writer.set_color(ColorSpec::new().set_fg(Some(Color::Red)))?;
+        for (path, _) in it {
+            writeln!(&mut writer, "\t{path}")?;
+        }
+        writer.reset()?;
+    }
+
+    writer.flush()?;
+
+    Ok(())
+}
+
+fn print_porcelain_status(statuses: &[(&Utf8Path, Change)]) {
+    for (path, change) in statuses {
+        println!("{} {}", change, path);
     }
 }
 
@@ -46,6 +114,15 @@ pub enum Change {
     IndexAdded,
     IndexRemoved,
     IndexModified,
+}
+
+impl Change {
+    fn is_index(self) -> bool {
+        matches!(
+            self,
+            Change::IndexAdded | Change::IndexRemoved | Change::IndexModified
+        )
+    }
 }
 
 impl Display for Change {
@@ -172,5 +249,9 @@ impl<'r: 'i, 'i> Status<'r, 'i> {
         let new_oid = blob.into_oid();
 
         Ok(*entry.oid() != new_oid)
+    }
+
+    pub fn tree(&self) -> &Tree {
+        &self.head_tree
     }
 }

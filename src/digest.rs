@@ -1,15 +1,23 @@
 use std::{
     fmt::{Debug, LowerHex},
-    mem::MaybeUninit,
     ops::{Deref, DerefMut},
     str::FromStr,
 };
 
+use hex::FromHexError;
 use sha1::{Digest as _, Sha1};
+use tap::Tap;
 
 #[derive(Clone, Default, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Digest(pub [u8; 20]);
+
+impl Digest {
+    /// The null digest, 0x00000...
+    ///
+    /// This is used for deleted / missing files.
+    pub const NULL: Self = Digest([0; 20]);
+}
 
 impl Digest {
     /// Hash the input bytes and return the resulting digest.
@@ -17,14 +25,14 @@ impl Digest {
         let mut hasher = Sha1::new();
         hasher.update(&bytes);
         let fin = hasher.finalize();
-        debug_assert!(fin.len() == 20);
-        // Unsafe dance to avoid writing 20 bytes of 0 and immediately overwriting it
-        // Yes I know this is pointless over-optimisation but its my project so I'm allowed.
-        unsafe {
-            let mut buf: MaybeUninit<Self> = MaybeUninit::uninit();
-            std::ptr::copy(fin.as_ptr(), buf.as_mut_ptr().cast(), 20);
-            buf.assume_init()
-        }
+        assert_eq!(fin.len(), 20);
+        // Copy 20 bytes out of the GenericArray and transmute to `Self`
+        //
+        // This is safe because:
+        // - `GenericArray` is marked as `#[repr(transparent)]`
+        // - `fin.len()` is `20`
+        // - `Self` is marked as `#[repr(transparent)]`, and `self.0.len()` os `20`
+        unsafe { fin.as_ptr().cast::<Self>().read() }
     }
 
     /// Format the digest as a hex string.
@@ -32,6 +40,13 @@ impl Digest {
     /// Identical to `format!("{:x}", self)`.
     pub fn to_hex(&self) -> String {
         hex::encode(self.0)
+    }
+
+    /// Shorten a Digest, usually for display purposes.
+    ///
+    /// Note: This doesn't check for collisions.
+    pub fn short(&self) -> String {
+        self.to_hex().tap_mut(|x| x.truncate(7))
     }
 }
 
@@ -66,7 +81,9 @@ impl FromStr for Digest {
 
     fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
         let bytes = hex::decode(s)?;
-        assert!(bytes.len() == 20);
+        if bytes.len() != 20 {
+            return Err(FromHexError::InvalidStringLength);
+        }
         Ok(Digest(bytes.try_into().unwrap()))
     }
 }
@@ -88,5 +105,34 @@ mod tests {
         let actual = Digest::new(HASH_INPUT);
         println!("{}", actual.to_hex());
         assert_eq!(actual.0, HASH_OUTPUT);
+    }
+
+    #[test]
+    fn test_from_str() {
+        let valid = [
+            "0a0a9f2a6772942557ab5355d76af442f8f65e01",
+            "0A0A9F2A6772942557AB5355D76AF442F8F65E01",
+            "0a0a9f2a6772942557ab5355D76AF442F8F65E01",
+        ];
+
+        for string in valid {
+            let _ = Digest::from_str(string).unwrap();
+        }
+
+        let invalid = [
+            "hello world",
+            "0j0a9f2a6772942557ab5355d76af442f8f65e01",
+            "🦀",
+            "0a0a9f2a6772942557ab5355d76af442f8f65e01 ",
+            " 0a0a9f2a6772942557ab5355d76af442f8f65e01",
+            "0a0a9f2a6772942557ab5355d76af442f8f65e01\n",
+            "0a0a9f2a6772942557ab5355d76af442f8f65e01\0",
+            "0a0a9f2a6772942\x0057ab5355d76af442f8f65e01",
+            "",
+        ];
+
+        for string in invalid {
+            let _ = Digest::from_str(string).unwrap_err();
+        }
     }
 }

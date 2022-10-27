@@ -9,6 +9,7 @@ use crate::Result;
 
 use std::io::Read;
 use std::io::Write;
+use std::str::FromStr;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
@@ -73,12 +74,28 @@ impl Database {
         x
     }
 
+    fn object_dir(&self, prefix: &str) -> Option<Utf8PathBuf> {
+        if prefix.len() < 2 {
+            return None;
+        }
+        let mut x = self.database_root.to_owned();
+        let prefix = &prefix[..2];
+        debug_assert_eq!(prefix.len(), 2);
+        x.push(prefix);
+        Some(x)
+    }
+
     pub fn exists(&self, oid: &Digest) -> bool {
         self.object_path(oid).exists()
     }
 
+    pub fn contains(&self, oid: &Digest) -> bool {
+        let object_path = self.object_path(oid);
+        object_path.exists()
+    }
+
     pub fn read_to_vec(&self, oid: &Digest) -> Result<Vec<u8>> {
-        trace!(object=%oid.to_hex(), "Reading object from database");
+        trace!(object=%oid.to_hex(), "reading object from database");
 
         let object_path = self.object_path(oid);
 
@@ -127,6 +144,38 @@ impl Database {
             }
             _ => unreachable!("Unexpected object type: {}", std::str::from_utf8(r#type)?),
         }
+    }
+
+    pub fn prefix_match(&self, prefix: &str) -> Result<Vec<Digest>> {
+        let dirname = match self.object_dir(prefix) {
+            Some(x) => x,
+            None => return Ok(Vec::new()),
+        };
+
+        if !dirname.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut candidates = Vec::new();
+
+        let prefix = &prefix[2..];
+
+        let basename = dirname.file_name().unwrap();
+
+        for file in dirname.read_dir()? {
+            let file = file?;
+            let path = file.path();
+            let path = Utf8PathBuf::from_path_buf(path).expect("All paths should be valid utf-8");
+            let name = path.file_name().expect("File should have a name");
+
+            let oid = Digest::from_str(&format!("{}{}", basename, name))?;
+
+            if name.starts_with(prefix) {
+                candidates.push(oid);
+            }
+        }
+
+        Ok(candidates)
     }
 }
 
