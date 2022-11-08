@@ -177,6 +177,27 @@ impl Database {
 
         Ok(candidates)
     }
+
+    /// Returns a vec of all objects in the database
+    pub fn entries(&self) -> Vec<Digest> {
+        let mut entries = Vec::new();
+
+        for dir in self.database_root.read_dir().unwrap() {
+            let dir = dir.unwrap();
+            let dir = Utf8PathBuf::from_path_buf(dir.path()).unwrap();
+            for file in dir.read_dir().unwrap() {
+                let file = file.unwrap();
+                let file = Utf8PathBuf::from_path_buf(file.path()).unwrap();
+                let name = file.file_name().unwrap();
+                // XXX: Work out how to parse digests without allocating
+                let oid =
+                    Digest::from_str(&format!("{}{}", dir.file_name().unwrap(), name)).unwrap();
+                entries.push(oid);
+            }
+        }
+
+        entries
+    }
 }
 
 pub enum LoadedItem {
@@ -207,6 +228,19 @@ impl LoadedItem {
             Some(v)
         } else {
             None
+        }
+    }
+
+    /// Return a string representation of type of the object.
+    pub const fn kind(&self) -> &'static str {
+        const COMMIT: &str = "commit";
+        const TREE: &str = "tree";
+        const BLOB: &str = "blob";
+
+        match self {
+            LoadedItem::Commit(_) => COMMIT,
+            LoadedItem::Tree(_) => TREE,
+            LoadedItem::Blob(_) => BLOB,
         }
     }
 

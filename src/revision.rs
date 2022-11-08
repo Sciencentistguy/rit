@@ -7,7 +7,11 @@
 
 use std::str::FromStr;
 
-use crate::{digest::Digest, repo::Repo, Result};
+use crate::{
+    digest::Digest,
+    repo::{database::LoadedItem, Repo},
+    Result,
+};
 
 use color_eyre::eyre::{eyre, Context};
 
@@ -52,13 +56,13 @@ pub fn is_valid_ref_name(name: &str) -> bool {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct Rev {
+pub struct Rev {
     refname: Refname,
     distance: u64,
 }
 
 impl Rev {
-    fn parse(mut input: &str) -> Result<Self> {
+    pub fn parse(mut input: &str) -> Result<Self> {
         let mut distance = 0;
         loop {
             if input.ends_with('^') {
@@ -76,7 +80,7 @@ impl Rev {
         }
     }
 
-    fn resolve(self, repo: &Repo) -> Result<Option<Digest>> {
+    pub fn resolve(self, repo: &Repo) -> Result<Option<Digest>> {
         let Self {
             refname,
             mut distance,
@@ -126,9 +130,10 @@ impl Rev {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum Refname {
+pub enum Refname {
     BranchTag(String),
     Sha1(Digest),
+    PartialSha1(String),
     Head,
 }
 
@@ -142,6 +147,10 @@ impl Refname {
             return Ok(Self::Sha1(digest));
         }
 
+        if input.chars().all(|c| c.is_ascii_hexdigit()) && input.len() <= 40 {
+            return Ok(Self::PartialSha1(input.to_owned()));
+        }
+
         if !is_valid_ref_name(input) {
             return Err(eyre!("Invalid ref name: {}", input));
         }
@@ -150,7 +159,15 @@ impl Refname {
     }
 
     pub fn resolve(&self, repo: &Repo) -> Result<Option<Digest>> {
-        dbg!(self);
+        fn branchtag(name: &str, repo: &Repo) -> Result<Option<Digest>> {
+            let oid = match repo.read_ref(name)? {
+                Some(x) => x,
+                None => return Ok(None),
+            };
+
+            Ok(Some(oid))
+        }
+
         match self {
             Refname::Head => {
                 let oid = match repo.read_head()? {
@@ -163,24 +180,58 @@ impl Refname {
 
             Refname::Sha1(oid) => {
                 if repo.database.contains(oid) {
-                    if repo.database.load(oid)?.is_commit() {
-                        Ok(Some(oid.clone()))
-                    } else {
-                        Err(eyre!("Refname was a valid sha1, but pointed to something other than a commit"))
+                    match repo.database.load(oid)? {
+                        LoadedItem::Commit(_) => Ok(Some(oid.clone())),
+                        other => Err(eyre!(
+                            "Ref '{:x}' pointed to something other than a commit: {}",
+                            oid,
+                            other.kind()
+                        )),
                     }
                 } else {
                     Ok(None)
                 }
             }
 
-            Refname::BranchTag(name) => {
-                let oid = match repo.read_ref(name)? {
-                    Some(x) => x,
-                    None => return Ok(None),
-                };
+            Refname::PartialSha1(candidate) => {
+                // let candidates = repo.database.contains(oid)
+                let entries = repo.database.entries();
 
-                Ok(Some(oid))
+                let candidates = entries
+                    .into_iter()
+                    .filter_map(|entry| {
+                        if entry.to_hex().starts_with(candidate) {
+                            Some(entry)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                match candidates.as_slice() {
+                    [] => branchtag(candidate, repo),
+                    [oid] => match repo.database.load(oid)? {
+                        LoadedItem::Commit(_) => Ok(Some(oid.clone())),
+                        other => Err(eyre!(
+                            "Ref '{:x}' pointed to something other than a commit: {}",
+                            oid,
+                            other.kind()
+                        )),
+                    },
+                    _ => {
+                        println!(
+                            "Ambiguous ref name: {} matches multiple candidates:",
+                            candidate
+                        );
+                        for candidate in candidates {
+                            println!("  {:x}", candidate);
+                        }
+                        Err(eyre!("Ambiguous ref name"))
+                    }
+                }
             }
+
+            Refname::BranchTag(name) => branchtag(name, repo),
         }
     }
 }
@@ -307,7 +358,7 @@ mod parser_tests {
                 distance: 2,
             },
             Rev {
-                refname: Refname::BranchTag("abc123".to_owned()),
+                refname: Refname::PartialSha1("abc123".to_owned()),
                 distance: 3,
             },
         ];
@@ -351,9 +402,9 @@ mod evaluator_tests {
         repo.commit("three")?;
         crate::create_test_files!(dir, ["file4"]);
         repo.add_all()?;
-        dbg!(repo.commit("four")?);
+        let commit_id = dbg!(repo.commit("four")?);
 
-        repo.create_branch("master")?;
+        repo.create_branch("master", &commit_id)?;
 
         Ok(repo)
     }
@@ -436,6 +487,14 @@ mod evaluator_tests {
         dbg!(&oid);
         let commit = repo.database.load(&oid)?.into_commit().unwrap();
         assert_eq!(commit.message(), "four");
+
+        let shortened = oid.to_hex()[..].to_owned();
+
+        // Check that the shortened oid resolves to the same commit.
+        let rev = Rev::parse(&shortened)?;
+        let oid = rev.resolve(&repo)?.unwrap();
+        let commit_from_short = repo.database.load(&oid)?.into_commit().unwrap();
+        assert_eq!(commit.message(), commit_from_short.message());
 
         let rev = Rev::parse("main")?;
         assert_eq!(rev.resolve(&repo)?, None);

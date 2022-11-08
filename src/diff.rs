@@ -252,7 +252,11 @@ impl<'a> Hunk<'a> {
             })
             .peekable();
 
-        let start = lines.peek().map(|x| x.index).or(default).unwrap_or_default();
+        let start = lines
+            .peek()
+            .map(|x| x.index)
+            .or(default)
+            .unwrap_or_default();
 
         let lines = lines.count();
 

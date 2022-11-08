@@ -37,6 +37,7 @@ pub enum Command {
         long: bool,
     },
 
+    /// Show changes between commits, commit and working tree, etc
     Diff {
         #[clap(long)]
         cached: bool,
@@ -45,10 +46,16 @@ pub enum Command {
     /// Equivalent to `jit/show_head.rb`
     ShowHead { oid: Option<Digest> },
 
+    /// List, create, or delete branches
     Branch {
-        name: Option<String>,
-        #[clap(short = 'D', long)]
+        #[clap(num_args(1..))]
+        patterns: Vec<String>,
+        #[clap(short = 'd', long)]
         delete: bool,
+        #[clap(short, long)]
+        list: bool,
+        #[clap(short, long)]
+        force: bool,
     },
 }
 

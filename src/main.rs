@@ -18,10 +18,11 @@ mod tree;
 mod util;
 
 use camino::Utf8PathBuf;
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{eyre, Context};
 pub use color_eyre::Result;
 use repo::diff::DiffMode;
 use repo::status::StatusOutputMode;
+use revision::Rev;
 use tracing::{info, Level};
 use tracing_subscriber::fmt::Subscriber;
 use tracing_subscriber::EnvFilter;
@@ -124,7 +125,33 @@ fn main() -> Result<()> {
 
         Command::ShowHead { oid } => repo.show_head(oid.clone())?,
 
-        Command::Branch { name, delete } => repo.branch(name.as_deref(), *delete)?,
+        #[allow(unused_variables)]
+        Command::Branch {
+            patterns,
+            delete,
+            list,
+            force,
+        } => {
+            match patterns.as_slice() {
+                [] => todo!("List branches"),
+
+                [name] => {
+                    // FIXME: don't explode on a just-inited repo
+                    let head = repo
+                        .read_head()?
+                        .ok_or_else(|| eyre!("Repo does not have a HEAD"))?;
+
+                    repo.create_branch(name, &head)?
+                }
+                [name, rev] => {
+                    let rev = Rev::parse(rev)?
+                        .resolve(&repo)?
+                        .ok_or_else(|| eyre!("Provided revision does not exist: '{}'", rev))?;
+                    repo.create_branch(name, &rev)?
+                }
+                _ => todo!("catch this with clap?"),
+            }
+        }
     };
 
     Ok(())
