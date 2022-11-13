@@ -42,7 +42,13 @@ impl super::TreeEntry {
 
         let (mode, line) = line.split_at(mode_len);
         let mode = str::from_utf8(mode)?.trim();
-        let mode = FileMode::from(u32::from_str_radix(mode, 8)?);
+        let mode = u32::from_str_radix(mode, 8)?;
+
+        // mode_t is a u16 bits on macOS
+        #[cfg(target_os = "macos")]
+        let mode: libc::mode_t = mode as _;
+
+        let mode = FileMode::from(mode);
 
         let line = &line[1..];
         let name = unsafe {
