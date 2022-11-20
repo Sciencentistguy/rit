@@ -292,7 +292,7 @@ mod tests {
         std::fs::set_permissions(dir.join("file2"), Permissions::from_mode(0o100755))?;
         std::fs::set_permissions(dir.join("file3"), Permissions::from_mode(0o100655))?;
 
-        Repo::init(dir)?;
+        Repo::init_default(dir)?;
         let mut rit_repo = Repo::open(dir.to_owned())?;
         rit_repo.add_all()?;
         let rit_index = std::fs::read(dir.join(".git/index"))?;

@@ -384,7 +384,7 @@ mod evaluator_tests {
         std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
         std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
 
-        Repo::init(dir)?;
+        Repo::init_default(dir)?;
 
         crate::create_test_files!(dir, ["file0"]);
 

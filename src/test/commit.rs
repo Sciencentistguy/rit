@@ -47,7 +47,7 @@ fn commit() -> Result<()> {
         "commit.gpgsign=false",
     ];
 
-    Repo::init(dir_rit)?;
+    Repo::init_default(dir_rit)?;
     let mut rit_repo = Repo::open(dir_rit.to_owned())?;
     write_test_files(dir_rit)?;
     rit_repo.add_all()?;
@@ -160,7 +160,7 @@ pub(super) fn commit_file_hierarchy() -> Result<()> {
         "commit.gpgsign=false",
     ];
 
-    Repo::init(dir_rit)?;
+    Repo::init_default(dir_rit)?;
     let mut rit_repo = Repo::open(dir_rit.to_owned())?;
 
     // Test files:

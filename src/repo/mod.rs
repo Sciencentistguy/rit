@@ -12,6 +12,8 @@ mod workspace;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
+use std::fs::File;
+use std::io::Write;
 use tracing::*;
 
 use crate::index::IndexWrapper;
@@ -34,6 +36,9 @@ pub struct Repo {
     pub database: Database,
     pub index: IndexWrapper,
 }
+
+/// The default location to store the git information. This cannot (yet) be changed.
+const DEFAULT_GIT_DIR: &str = ".git";
 
 impl Repo {
     pub fn open(repo_root: Utf8PathBuf) -> Result<Self> {
@@ -62,18 +67,31 @@ impl Repo {
         })
     }
 
-    pub fn init(path: &Utf8Path) -> Result<()> {
+    #[cfg(test)]
+    pub fn init_default(path: &Utf8Path) -> Result<()> {
+        Self::init(path, "master")
+    }
+
+    pub fn init(path: &Utf8Path, _branch_name: &str) -> Result<()> {
         trace!(?path, "Initialising repo");
         let git_dir = path.join(".git");
         if git_dir.exists() {
             warn!("Repo already exists, init will do nothing");
-        } else {
-            for d in ["objects", "refs", "refs/heads"] {
-                let dir = git_dir.join(d);
-                trace!(path=?dir, "Creating directory");
-                std::fs::create_dir_all(dir)?;
-            }
+            return Ok(());
         }
+        for d in ["objects", "refs", "refs/heads"] {
+            let dir = git_dir.join(d);
+            trace!(path=?dir, "Creating directory");
+            std::fs::create_dir_all(dir)?;
+        }
+        // TODO make this work
+        /*
+         * writeln!(
+         *     File::create(git_dir.join("HEAD"))?,
+         *     "ref: refs/heads/{}",
+         *     branch_name
+         * )?;
+         */
         Ok(())
     }
 }

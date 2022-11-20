@@ -319,7 +319,7 @@ mod tests {
         let root = root.path();
         let root = Utf8Path::from_path(root).unwrap();
 
-        Repo::init(root)?;
+        Repo::init_default(root)?;
         let mut repo = Repo::open(root.to_owned())?;
 
         crate::create_test_files!(root, ["file1"]);

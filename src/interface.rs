@@ -8,7 +8,10 @@ use crate::digest::Digest;
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
     /// Create an empty Git repository, or reinitialize an existing one
-    Init,
+    Init {
+        #[clap(short, long = "initial-branch", default_value("master"))]
+        branch_name: String,
+    },
 
     /// Record changes to the repository
     Commit {
@@ -106,6 +109,8 @@ pub struct Opt {
     #[clap(subcommand)]
     pub command: Command,
 
+    /// How verbose the tracing output should be. Multiple flags increase verbosity. Note that this
+    /// is overeridden by the `RUST_LOG` environment variable.
     #[clap(short, long, action(ArgAction::Count))]
     pub verbose: u8,
 

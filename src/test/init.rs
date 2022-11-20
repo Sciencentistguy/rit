@@ -8,7 +8,7 @@ use tempdir::TempDir;
 fn rit_init() -> Result<()> {
     let dir = TempDir::new("")?;
     let dir = Utf8Path::from_path(dir.as_ref()).unwrap();
-    Repo::init(dir)?;
+    Repo::init_default(dir)?;
 
     let git_dir = dir.join(".git");
     let obj_dir = git_dir.join("objects");
