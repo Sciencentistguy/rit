@@ -31,6 +31,7 @@ fn commit() -> Result<()> {
     let dir_rit = TempDir::new("")?;
     let dir_rit = dir_rit.path();
     let dir_rit = Utf8Path::from_path(dir_rit).unwrap();
+    println!("dir: {dir_rit}");
     let dir_git = TempDir::new("")?;
     let dir_git = dir_git.path();
     let dir_git = Utf8Path::from_path(dir_git).unwrap();

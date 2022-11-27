@@ -94,6 +94,35 @@ impl Database {
         object_path.exists()
     }
 
+    pub fn any<F>(&self, key: F) ->Result<bool>
+    where
+        F: Fn(&LoadedItem) -> bool,
+    {
+        for dir in self.database_root.read_dir().unwrap() {
+            let dir = dir.unwrap();
+            if !dir.file_type().unwrap().is_dir() {
+                continue;
+            }
+            for file in dir.path().read_dir().unwrap() {
+                let file = file.unwrap();
+                if !file.file_type().unwrap().is_file() {
+                    continue;
+                }
+                let item = self
+                    .load(&Digest::from_str(&format!(
+                        "{}{}",
+                        dir.file_name().to_str().unwrap(),
+                        file.file_name().to_str().unwrap(),
+                    ))?)
+                    .unwrap();
+                if key(&item) {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
     pub fn read_to_vec(&self, oid: &Digest) -> Result<Vec<u8>> {
         trace!(object=%oid.to_hex(), "reading object from database");
 

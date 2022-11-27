@@ -66,7 +66,7 @@ fn main() -> Result<()> {
     };
 
     if let Command::Init { branch_name } = &ARGS.command {
-        Repo::init(&path, &branch_name)?;
+        Repo::init(&path, branch_name)?;
         return Ok(());
     }
 

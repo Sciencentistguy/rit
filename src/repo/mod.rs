@@ -72,7 +72,7 @@ impl Repo {
         Self::init(path, "master")
     }
 
-    pub fn init(path: &Utf8Path, _branch_name: &str) -> Result<()> {
+    pub fn init(path: &Utf8Path, branch_name: &str) -> Result<()> {
         trace!(?path, "Initialising repo");
         let git_dir = path.join(".git");
         if git_dir.exists() {
@@ -84,14 +84,27 @@ impl Repo {
             trace!(path=?dir, "Creating directory");
             std::fs::create_dir_all(dir)?;
         }
-        // TODO make this work
-        /*
-         * writeln!(
-         *     File::create(git_dir.join("HEAD"))?,
-         *     "ref: refs/heads/{}",
-         *     branch_name
-         * )?;
-         */
+
+        // Needed for `git status` to show correct branch
+        writeln!(
+            File::create(git_dir.join("HEAD"))?,
+            "ref: refs/heads/{}",
+            branch_name
+        )?;
+        
+
+        /// Needed for gitoxide's [`discover`] to work
+        /// TODO: actually generate this
+        /// 
+        /// [`discover`]: https://docs.rs/git-repository/latest/git_repository/struct.ThreadSafeRepository.html#method.discover
+        const DEFAULT_CONFIG: &str = "[core]
+\trepositoryformatversion = 0
+\tfilemode = true
+\tbare = false
+\tlogallrefupdates = true";
+
+        let config_path = git_dir.join("config");
+        write!(File::create(config_path)?, "{}", DEFAULT_CONFIG)?;
         Ok(())
     }
 }
