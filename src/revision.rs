@@ -194,7 +194,6 @@ impl Refname {
             }
 
             Refname::PartialSha1(candidate) => {
-                // let candidates = repo.database.contains(oid)
                 let entries = repo.database.entries();
 
                 let candidates = entries
@@ -209,7 +208,10 @@ impl Refname {
                     .collect::<Vec<_>>();
 
                 match candidates.as_slice() {
+                    // No candidates - treat as a branch / tag name
                     [] => branchtag(candidate, repo),
+
+                    // One candidate - Found it!
                     [oid] => match repo.database.load(oid)? {
                         LoadedItem::Commit(_) => Ok(Some(oid.clone())),
                         other => Err(eyre!(
@@ -218,13 +220,16 @@ impl Refname {
                             other.kind()
                         )),
                     },
+
+                    // Multiple candidates - Ambiguous, tell user to be more specific
                     _ => {
                         println!(
-                            "Ambiguous ref name: {} matches multiple candidates:",
+                            "Ambiguous ref name: `{}` matches multiple candidates:",
                             candidate
                         );
                         for candidate in candidates {
-                            println!("  {:x}", candidate);
+                            let kind = repo.database.load(&candidate)?.kind();
+                            println!("  {:x} {}", candidate, kind);
                         }
                         Err(eyre!("Ambiguous ref name"))
                     }
