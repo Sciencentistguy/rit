@@ -185,6 +185,9 @@ impl Database {
         for dir in self.database_root.read_dir().unwrap() {
             let dir = dir.unwrap();
             let dir = Utf8PathBuf::from_path_buf(dir.path()).unwrap();
+            if dir.file_name().unwrap() == "pack" {
+                continue;
+            }
             for file in dir.read_dir().unwrap() {
                 let file = file.unwrap();
                 let file = Utf8PathBuf::from_path_buf(file.path()).unwrap();
