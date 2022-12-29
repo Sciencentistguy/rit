@@ -18,8 +18,10 @@ struct IndexHeader {
 }
 
 impl IndexHeader {
+    const MAGIC: &'static [u8; 4] =  b"DIRC";
+
     fn has_valid_magic(&self) -> bool {
-        &self.magic == b"DIRC"
+        &self.magic == Self::MAGIC
     }
 }
 
@@ -186,7 +188,8 @@ impl IndexWrapper {
         self.entries.sort_unstable();
     }
 
-    pub fn write_out(&self) -> Result<()> {
+    /// Write out this index to the filesystem. This will overwrite the existing index
+    pub fn flush(&self) -> Result<()> {
         let index = Index::from_entries(&self.entries);
         let index = write::write_index(&index);
         std::fs::write(&self.path, index)?;

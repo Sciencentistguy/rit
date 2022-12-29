@@ -12,7 +12,8 @@ impl super::Repo {
         let entries = &self.index.entries();
         let root = Tree::build(entries).unwrap();
         trace!("Traversing root");
-        root.traverse(|tree| self.database.store(&DatabaseObject::new(&*tree))).unwrap();
+        root.traverse(|tree| self.database.store(&DatabaseObject::new(&*tree)))
+            .unwrap();
 
         let root = DatabaseObject::new(&root);
 

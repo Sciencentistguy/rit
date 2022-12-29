@@ -36,7 +36,7 @@ impl Descends for Utf8Path {
     }
 }
 
-pub fn align_to(n: usize, num: usize) -> usize {
+pub const fn align_to(n: usize, num: usize) -> usize {
     let extra = num % n;
     match extra {
         0 => num,
@@ -60,5 +60,3 @@ mod tests {
         assert!((0..64).map(|i| align_to(8, i)).all(|x| x % 8 == 0));
     }
 }
-
-

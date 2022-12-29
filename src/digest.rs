@@ -8,6 +8,9 @@ use hex::FromHexError;
 use sha1::{Digest as _, Sha1};
 use tap::Tap;
 
+/// A SHA1 digest.
+/// 
+/// Use as object IDs or as the hash of a file.
 #[derive(Clone, Default, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Digest(pub [u8; 20]);
@@ -25,7 +28,7 @@ impl Digest {
         let mut hasher = Sha1::new();
         hasher.update(&bytes);
         let fin = hasher.finalize();
-        assert_eq!(fin.len(), 20);
+        debug_assert_eq!(fin.len(), 20);
         // Copy 20 bytes out of the GenericArray and transmute to `Self`
         //
         // This is safe because:

@@ -91,11 +91,10 @@ impl Repo {
             "ref: refs/heads/{}",
             branch_name
         )?;
-        
 
         /// Needed for gitoxide's [`discover`] to work
         /// TODO: actually generate this
-        /// 
+        ///
         /// [`discover`]: https://docs.rs/git-repository/latest/git_repository/struct.ThreadSafeRepository.html#method.discover
         const DEFAULT_CONFIG: &str = "[core]
 \trepositoryformatversion = 0

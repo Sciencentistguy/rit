@@ -71,7 +71,7 @@ impl super::TreeEntry {
         let path = prefix.join(&name);
 
         if path.is_dir() {
-            let bytes = database.read_to_vec(&oid)?;
+            let bytes = database.read_uncompressed(&oid)?;
             let nul_idx = memchr::memchr(b'\0', &bytes).unwrap();
             let bytes = &bytes[nul_idx + 1..];
             let subtree = Tree::parse(bytes, &prefix.join(&name), database)?;

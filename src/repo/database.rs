@@ -94,7 +94,7 @@ impl Database {
         object_path.exists()
     }
 
-    pub fn any<F>(&self, key: F) ->Result<bool>
+    pub fn any<F>(&self, key: F) -> Result<bool>
     where
         F: Fn(&LoadedItem) -> bool,
     {
@@ -123,7 +123,9 @@ impl Database {
         Ok(false)
     }
 
-    pub fn read_to_vec(&self, oid: &Digest) -> Result<Vec<u8>> {
+    /// Read an item from the database to a Vec<u8>. The returned Vec contains uncompressed but
+    /// unparsed data.
+    pub fn read_uncompressed(&self, oid: &Digest) -> Result<Vec<u8>> {
         trace!(object=%oid.to_hex(), "reading object from database");
 
         let object_path = self.object_path(oid);
@@ -143,21 +145,20 @@ impl Database {
         Ok(decompressed)
     }
 
+    /// Read an item from the database, and parse it into a `LoadedItem`.
+    ///
     pub fn load(&self, oid: &Digest) -> Result<LoadedItem> {
-        let mut bytes = self.read_to_vec(oid)?;
+        let mut bytes = self.read_uncompressed(oid)?;
 
-        let space_idx = memchr::memchr(b' ', &bytes).unwrap();
         let nul_idx = memchr::memchr(b'\0', &bytes).unwrap();
-        let r#type = &bytes[..space_idx];
-        debug_assert!({
-            let len = &bytes[space_idx + 1..nul_idx];
-            let len = std::str::from_utf8(len)?;
-            len.parse::<usize>()? > 0
-        });
+        let header = &bytes[..nul_idx];
+        let header = DBHeader::from_bytes(header)?;
+
+        debug_assert!(header.len > 0);
 
         let content_start = nul_idx + 1;
 
-        match r#type {
+        match header.type_string {
             b"blob" => {
                 bytes.drain(0..content_start);
                 Ok(LoadedItem::Blob(Blob::new(bytes)))
@@ -171,7 +172,10 @@ impl Database {
                 let bytes = &bytes[content_start..];
                 Ok(LoadedItem::Commit(Commit::parse(bytes)?))
             }
-            _ => unreachable!("Unexpected object type: {}", std::str::from_utf8(r#type)?),
+            type_string => unreachable!(
+                "Unexpected object type: {}",
+                String::from_utf8_lossy(type_string)
+            ),
         }
     }
 
@@ -229,6 +233,29 @@ impl Database {
         }
 
         entries
+    }
+}
+
+/// The header of database entry
+/// An item header consists of a type string, a space, the size of the object in bytes,
+/// terminated with a `b'0'`.
+#[derive(Debug)]
+struct DBHeader<'a> {
+    type_string: &'a [u8],
+    len: usize,
+}
+
+impl<'a> DBHeader<'a> {
+    /// Parse a DBHeader from a slice of bytes. The slice must end before the first `b'\0'` byte.
+    fn from_bytes(bytes: &'a [u8]) -> Result<Self> {
+        let space_idx = memchr::memchr(b' ', bytes).unwrap();
+
+        let type_string = &bytes[..space_idx];
+        let len = &bytes[space_idx + 1..];
+        let len = std::str::from_utf8(len)?;
+        let len = len.parse::<usize>()?;
+
+        Ok(DBHeader { type_string, len })
     }
 }
 
