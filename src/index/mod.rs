@@ -1,6 +1,7 @@
 mod parse;
 mod write;
 
+use bstr::ByteSlice;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::HashSet;
 
@@ -17,8 +18,18 @@ struct IndexHeader {
     num_entries: u32,
 }
 
+impl std::fmt::Debug for IndexHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IndexHeader")
+            .field("magic", &self.magic.to_os_str().unwrap())
+            .field("version", &self.version)
+            .field("num_entries", &self.num_entries)
+            .finish()
+    }
+}
+
 impl IndexHeader {
-    const MAGIC: &'static [u8; 4] =  b"DIRC";
+    const MAGIC: &'static [u8; 4] = b"DIRC";
 
     fn has_valid_magic(&self) -> bool {
         &self.magic == Self::MAGIC
@@ -246,6 +257,8 @@ mod tests {
     use super::{parse::*, write::*};
     use crate::repo::Repo;
     use crate::Result;
+
+    use pretty_assertions::assert_eq;
 
     #[test]
     #[ignore = "Doesn't work in CI"]
