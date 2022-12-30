@@ -66,20 +66,12 @@ mod nom {
         let (i, siz) = be_u32(i)?;
         let (i, oid) = take(20usize)(i)?;
         let (i, flags) = be_u16(i).map(|(i, x)| (i, IndexEntryFlags(x)))?;
-        // let (i, flags) = be_u16(i)?;
 
-        // dbg!(flags.name_length());
         let (i, name) = if let Some(len) = flags.name_length() {
             take(len)(i)?
         } else {
             take_till(|x| x == b'\0')(i)?
         };
-        dbg!(&i[..16]);
-        // let (i, name) = take_till(|x| x == b'\0')(i)?;
-        // let len = name.len();
-        // let padded_len = crate::util::align_to(8, len);
-        // let (i, _padding) = take(padded_len - len)(i)?;
-        // dbg!(_padding);
 
         let (i, _padding) = nom::bytes::complete::take_while(|x| x == b'\0')(i)?;
 
