@@ -1,5 +1,7 @@
 use std::process::exit;
 
+use tracing::warn;
+
 use crate::interface::CatFile;
 use crate::repo::database::LoadedItem;
 use crate::repo::Repo;
@@ -59,8 +61,13 @@ pub fn handle(repo: &mut Repo, args: &CatFile) -> Result<()> {
             object,
             allow_unknown_type,
         } => {
-            todo!()
+            if *allow_unknown_type {
+                warn!("--allow-unknown-type is not implemented");
+            }
+            println!("{}", repo.database.load(object)?.kind());
+            Ok(())
         }
+
         CatFile::Size {
             object,
             allow_unknown_type,
