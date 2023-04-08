@@ -1,51 +1,14 @@
 mod parse;
 mod write;
 
-use std::fmt::Display;
-
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::FixedOffset;
 
 use crate::digest::Digest;
 use crate::repo::Repo;
+use crate::timestamp::Timestamp;
 use crate::Result;
 
 struct GpgSig;
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-struct Timestamp {
-    unix: u64,
-    offset: i64,
-}
-
-impl Timestamp {
-    pub fn now() -> Self {
-        let unix = chrono::offset::Local::now()
-            .timestamp()
-            .try_into()
-            .expect("Time should be positive");
-        let offset_seconds = chrono::offset::Local::now().offset().utc_minus_local() as i64;
-        let offset_hours = offset_seconds / 60;
-        let offset = offset_hours * 100;
-
-        Self { unix, offset }
-    }
-
-    fn format(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl Display for Timestamp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {}{:04}",
-            self.unix,
-            if self.offset.is_negative() { '-' } else { '+' },
-            self.offset.abs()
-        )
-    }
-}
 
 #[derive(Debug, Clone)]
 struct Signature {
@@ -138,15 +101,7 @@ impl Commit {
         Ok(())
     }
 
-    pub(crate) fn commit_date(&self) -> chrono::NaiveDate {
-        let unix = self.committer.when.unix;
-        NaiveDateTime::from_timestamp(
-            unix.try_into()
-                // If you're somehow using this crate in 300 billion years time, where unix
-                // timestamps don't fit in an i64, then I'm sorry.
-                .expect("Timestamp should be positive and fit in an i64."),
-            0,
-        )
-        .date()
+    pub(crate) fn commit_date(&self) -> chrono::Date<FixedOffset> {
+        self.committer.when.0.date()
     }
 }

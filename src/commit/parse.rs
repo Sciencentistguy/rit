@@ -69,38 +69,20 @@ mod nom {
         let (i, email) = take_till(|b| b == b'>').context("email").parse(i)?;
         let email = email.trim().to_str().unwrap();
         let (i, _) = tag(b"> ")(i)?;
-        let (i, timestamp) = take_while(|b: u8| b.is_ascii_digit())
-            .context("timestamp")
+
+        // the rest of the string, up to \n, is the unix timestamp, and the offset "%s %z"
+        let (i, time) = take_till(|b| b == b'\n')
+            .context("timestamp/offset")
             .parse(i)?;
-        let (i, _) = tag(b" ")(i)?;
-
-        fn parse_offset(i: Input) -> Result<i64> {
-            let (i, sign) = tag(b"+")
-                .parse(i)
-                .or_else(|_: nom::Err<nom::error::VerboseError<_>>| tag(b"-").parse(i))?;
-            let sign = match sign {
-                b"+" => 1,
-                b"-" => -1,
-                _ => unreachable!(),
-            };
-            let (i, offset) = take_while(|b: u8| b.is_ascii_digit())
-                .context("offset")
-                .parse(i)?;
-
-            Ok((i, offset.to_str().unwrap().parse::<i64>().unwrap() * sign))
-        }
-
-        let (i, offset) = parse_offset.context("timestamp offset").parse(i)?;
+        let time = time.trim().to_str().unwrap();
+        let time = Timestamp::from_git(time).unwrap();
 
         Ok((
             i,
             Signature {
                 name: name.to_owned(),
                 email: email.to_owned(),
-                when: Timestamp {
-                    unix: timestamp.to_str().unwrap().parse().unwrap(),
-                    offset,
-                },
+                when: time,
             },
         ))
     }
@@ -184,6 +166,8 @@ impl Commit {
 mod tests {
     use std::str::FromStr;
 
+    use chrono::{DateTime, FixedOffset, NaiveDate};
+
     use super::*;
 
     #[test]
@@ -194,13 +178,16 @@ mod tests {
         assert_eq!(signature.name, "Jamie Quigley");
         assert_eq!(signature.email, "jamie@quigley.xyz");
 
-        assert_eq!(
-            signature.when,
-            Timestamp {
-                unix: 1658312219,
-                offset: 100
-            }
-        );
+        let expected_ts = {
+            let ndt = NaiveDate::from_ymd_opt(2022, 7, 20)
+                .unwrap()
+                .and_hms_opt(11, 16, 59)
+                .unwrap();
+            let offset = FixedOffset::east(60 * 60 /*1 hour*/);
+            DateTime::<FixedOffset>::from_local(ndt, offset)
+        };
+
+        assert_eq!(signature.when.0, expected_ts,);
     }
 
     #[test]

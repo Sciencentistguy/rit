@@ -9,7 +9,7 @@ use sha1::{Digest as _, Sha1};
 use tap::Tap;
 
 /// A SHA1 digest.
-/// 
+///
 /// Use as object IDs or as the hash of a file.
 #[derive(Clone, Default, PartialEq, Eq)]
 #[repr(transparent)]

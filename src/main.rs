@@ -14,6 +14,7 @@ mod interface;
 mod repo;
 mod revision;
 mod storable;
+mod timestamp;
 mod tree;
 mod util;
 

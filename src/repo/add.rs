@@ -6,7 +6,7 @@ use crate::{blob::Blob, storable::DatabaseObject, Result};
 
 impl super::Repo {
     /// Add paths to the index.
-    /// 
+    ///
     /// if `paths` is empty, do nothing
     pub fn add(&mut self, paths: &[Utf8PathBuf]) -> Result<()> {
         for path in paths {
