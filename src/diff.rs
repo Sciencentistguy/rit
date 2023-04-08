@@ -32,8 +32,6 @@ pub fn hunks<'a>(edits: &[Edit<'a>]) -> Vec<Hunk<'a>> {
 
         offset = offset.saturating_sub(HUNK_CONTEXT + 1);
 
-        dbg!(&edits[offset]);
-
         let a_start = edits[offset].a_line.map(|x| x.index);
         let b_start = edits[offset].a_line.map(|x| x.index);
         hunks.push(Hunk {

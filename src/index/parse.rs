@@ -82,11 +82,9 @@ mod nom {
             Err(e) => return Ok((i, Err(e.into()))),
         };
 
-        dbg!(&name);
-
         Ok((
             i,
-            Ok(dbg!(super::IndexEntry {
+            Ok(super::IndexEntry {
                 ctime_s,
                 ctime_n,
                 mtime_s,
@@ -100,7 +98,7 @@ mod nom {
                 oid,
                 flags: flags.0,
                 name,
-            })),
+            }),
         ))
     }
 

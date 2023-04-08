@@ -8,6 +8,7 @@ use tap::Tap;
 use tracing::trace;
 
 use crate::digest::Digest;
+use crate::repo::database::LoadedItem;
 use crate::revision::is_valid_ref_name;
 use crate::Result;
 
@@ -47,9 +48,15 @@ impl super::Repo {
         if let Some(path) = self.path_for_ref(name) {
             let string = std::fs::read_to_string(path)?;
             let string = string.trim();
-            dbg!(string);
-            let oid = Digest::from_str(string)?;
 
+            if string.starts_with("ref: refs/") {
+                // This is a symbolic ref
+                // See: https://git-scm.com/docs/git-symbolic-ref
+                let target = string.trim_start_matches("ref: refs/");
+                return self.read_ref(target);
+            }
+
+            let oid = Digest::from_str(string)?;
             return Ok(Some(oid));
         }
 
@@ -58,26 +65,34 @@ impl super::Repo {
             return Ok(None);
         }
 
-        let mut candidates = self.database.prefix_match(name)?;
+        let candidates = self.database.prefix_match(name)?;
 
-        match candidates.len() {
-            0 => Ok(None),
-            1 => {
-                let oid = candidates.pop().unwrap();
-                if self.database.load(&oid)?.is_commit() {
-                    Ok(Some(oid))
-                } else {
-                    Err(eyre!("Refname was a valid sha1 fragment, but pointed to something other than a commit"))
-                }
-            }
-            _ => {
+        match &candidates[..] {
+            [] => Ok(None),
+            [oid] => Ok(Some(oid.clone())),
+            candidates => {
+                // TODO: this should not explode. Make it return a real error type that captures
+                // this information
                 eprintln!("Too many candidates for prefix {}:", name);
 
                 for candidate in candidates {
-                    eprintln!("\t{:x}", candidate);
+                    eprint!("\t{candidate:x}");
+                    let loaded = self.database.load(candidate)?;
+                    let kind = loaded.kind();
+                    eprint!(" {kind}");
+                    if let LoadedItem::Commit(commit) = loaded {
+                        let date = commit.commit_date();
+                        let first_line = commit
+                            .message()
+                            .split_once('\n')
+                            .map(|x| x.0)
+                            .unwrap_or(commit.message());
+                        eprint!(" {date}: {first_line}");
+                    }
+                    eprintln!()
                 }
 
-                Err(eyre!("Too many candidates for prefix {}:", name))
+                std::process::exit(1);
             }
         }
     }

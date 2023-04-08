@@ -78,7 +78,7 @@ pub enum CatFile {
     #[clap(short_flag = 'p')]
     PrettyPrint {
         #[clap(value_name = "object")]
-        object: Digest,
+        object_ref: String,
     },
 
     /// Print the type of `object` to stdout

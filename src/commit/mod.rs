@@ -1,6 +1,10 @@
 mod parse;
 mod write;
 
+use std::fmt::Display;
+
+use chrono::{NaiveDate, NaiveDateTime};
+
 use crate::digest::Digest;
 use crate::repo::Repo;
 use crate::Result;
@@ -27,7 +31,14 @@ impl Timestamp {
     }
 
     fn format(&self) -> String {
-        format!(
+        self.to_string()
+    }
+}
+
+impl Display for Timestamp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
             "{} {}{:04}",
             self.unix,
             if self.offset.is_negative() { '-' } else { '+' },
@@ -101,5 +112,41 @@ impl Commit {
 
     pub fn message(&self) -> &str {
         self.message.as_ref()
+    }
+
+    pub fn pretty_print(&self) -> std::io::Result<()> {
+        println!("tree {:x}", self.tree_id);
+        for parent in &self.parents {
+            println!("parent {parent:x}");
+        }
+        println!(
+            "author {} <{}> {}",
+            self.author.name, self.author.email, self.author.when
+        );
+        println!(
+            "committer {} <{}> {}",
+            self.committer.name, self.committer.email, self.committer.when
+        );
+
+        if let Some(_gpgsig) = &self.gpgsig {
+            println!("gpgsig [not yet implemented]");
+        }
+        println!();
+
+        println!("{}", self.message);
+
+        Ok(())
+    }
+
+    pub(crate) fn commit_date(&self) -> chrono::NaiveDate {
+        let unix = self.committer.when.unix;
+        NaiveDateTime::from_timestamp(
+            unix.try_into()
+                // If you're somehow using this crate in 300 billion years time, where unix
+                // timestamps don't fit in an i64, then I'm sorry.
+                .expect("Timestamp should be positive and fit in an i64."),
+            0,
+        )
+        .date()
     }
 }
