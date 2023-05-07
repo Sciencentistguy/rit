@@ -1,10 +1,6 @@
 mod parse;
 mod write;
 
-use std::fmt::Display;
-
-use chrono::NaiveDateTime;
-
 use crate::digest::Digest;
 use crate::repo::Repo;
 use crate::timestamp::Timestamp;
