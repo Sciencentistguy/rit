@@ -20,7 +20,7 @@ fn init_repo(dir: &Utf8Path) -> Result<Repo> {
 
     crate::create_test_files!(dir, ["file1", "file2", "file3", "file4"]);
 
-    Repo::init(dir)?;
+    Repo::init_default(dir)?;
 
     let mut repo = Repo::open(dir.to_owned())?;
     repo.add_all()?;
@@ -293,7 +293,7 @@ fn test_index_remove() -> Result<()> {
     std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
     std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
 
-    Repo::init(dir)?;
+    Repo::init_default(dir)?;
 
     crate::create_test_files!(dir, ["file1", "file2", "file3", "file4"]);
 

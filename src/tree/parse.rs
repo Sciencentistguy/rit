@@ -1,8 +1,6 @@
-use std::{collections::BTreeMap, ffi::CStr, str};
+use std::collections::BTreeMap;
 
 use crate::{
-    digest::Digest,
-    filemode::FileMode,
     index::IndexEntry,
     repo::{database::Database, Repo},
     tree::Tree,
@@ -12,16 +10,44 @@ use crate::{
 use super::TreeEntry;
 
 use camino::Utf8Path;
-use color_eyre::eyre::{eyre, Context};
+use color_eyre::eyre::eyre;
 use once_cell::sync::OnceCell;
+
+mod nom {
+    use bstr::ByteSlice;
+    use nom::Parser;
+
+    use crate::{digest::Digest, filemode::FileMode};
+
+    pub type Input<'a> = &'a [u8];
+    pub type Result<'a, O> = nom::IResult<Input<'a>, O, nom::error::VerboseError<Input<'a>>>;
+
+    /// Parses an entry from the tree. Lines are of the form
+    /// `<mode> <name>\0<oid>`
+    pub(super) fn parse_tree_entry(i: Input) -> Result<(FileMode, &str, Digest)> {
+        let (i, mode) = nom::bytes::complete::take_until(" ").parse(i)?;
+        let (i, _) = nom::bytes::complete::tag(" ").parse(i)?;
+        let (i, name) = nom::bytes::complete::take_until("\0").parse(i)?;
+        let (i, _) = nom::bytes::complete::tag("\0").parse(i)?;
+        let (i, oid) = nom::bytes::complete::take(20usize).parse(i)?;
+        let oid = Digest(oid.try_into().unwrap());
+
+        let mode = mode.to_str().unwrap().parse::<libc::mode_t>().unwrap();
+        let mode = FileMode::from(mode);
+        let name = name.to_str().unwrap();
+
+        Ok((i, (mode, name, oid)))
+    }
+}
 
 impl super::Tree {
     pub fn parse(mut bytes: &[u8], root: &Utf8Path, database: &Database) -> Result<Self> {
         let mut entries: BTreeMap<String, TreeEntry> = Default::default();
 
-        while let Some(null_idx) = bytes.iter().position(|&c| c == b'\0') {
-            let line = &bytes[..null_idx + 21];
-            bytes = &bytes[null_idx + 21..];
+        while let Some(null_idx) = memchr::memchr(b'\0', bytes) {
+            let (line, newbytes) = bytes.split_at(null_idx + 21);
+
+            bytes = newbytes;
 
             let (name, entry) = TreeEntry::parse(line, root, database)?;
             entries.insert(name, entry);
@@ -38,34 +64,15 @@ impl super::TreeEntry {
     /// Parses an entry from the tree. Lines are of the form
     /// `<mode> <name>\0<oid>`
     fn parse(line: &[u8], prefix: &Utf8Path, database: &Database) -> Result<(String, Self)> {
-        let mode_len = line.iter().position(|&b| b == b' ').unwrap();
+        let (_, (mode, name, oid)) = nom::parse_tree_entry(line)
+            .map_err(|e| eyre!("Failed to parse tree entry: {:?}", e))?;
 
-        let (mode, line) = line.split_at(mode_len);
-        let mode = str::from_utf8(mode)?.trim();
-        let mode = FileMode::from(u32::from_str_radix(mode, 8)?);
+        let name = name.to_owned();
 
-        let line = &line[1..];
-        let name = unsafe {
-            // Assert should never trip, as this is enforced by the loop condition in
-            // `Tree::parse`.
-            assert!(line.contains(&b'\0'), "Line must contain null byte");
-
-            // Safety: line contains null byte.
-            CStr::from_ptr(line.as_ptr().cast())
-        }
-        .to_str()
-        .wrap_err(eyre!("invalid utf-8 in tree entry name"))?
-        .to_owned();
-
-        let (_, oid) = line.split_at(name.len() + 1 /* for null byte*/);
-
-        let oid = Digest(oid.try_into().unwrap());
-
-        // let path = Utf8Path::new(&name);
         let path = prefix.join(&name);
 
         if path.is_dir() {
-            let bytes = database.read_to_vec(&oid)?;
+            let bytes = database.read_uncompressed(&oid)?;
             let nul_idx = memchr::memchr(b'\0', &bytes).unwrap();
             let bytes = &bytes[nul_idx + 1..];
             let subtree = Tree::parse(bytes, &prefix.join(&name), database)?;

@@ -1,5 +1,7 @@
 use crate::{digest::Digest, storable::Storable};
 
+use super::TreeEntry;
+
 impl Storable for super::Tree {
     fn format(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -8,6 +10,9 @@ impl Storable for super::Tree {
             data.push(b' ');
             data.extend_from_slice(name.as_bytes());
             data.push(b'\0');
+            if let TreeEntry::Directory { tree, .. } = entry {
+                let _ = tree.format(); // force the subtree to caluclate all its oids
+            }
             let oid = entry.oid().expect("subtree oid should have been inited");
             data.extend_from_slice(&**oid);
         }

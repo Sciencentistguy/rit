@@ -21,10 +21,10 @@ impl Storable for super::Commit {
             },
             self.author.name,
             self.author.email,
-            self.author.when.format(),
+            self.author.when,
             self.committer.name,
             self.committer.email,
-            self.committer.when.format(),
+            self.committer.when,
             self.message
         );
         let mut formatted = Vec::new();

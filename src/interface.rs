@@ -8,7 +8,10 @@ use crate::digest::Digest;
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
     /// Create an empty Git repository, or reinitialize an existing one
-    Init,
+    Init {
+        #[clap(short, long = "initial-branch", default_value("master"))]
+        branch_name: String,
+    },
 
     /// Record changes to the repository
     Commit {
@@ -37,6 +40,7 @@ pub enum Command {
         long: bool,
     },
 
+    /// Show changes between commits, commit and working tree, etc
     Diff {
         #[clap(long)]
         cached: bool,
@@ -45,10 +49,16 @@ pub enum Command {
     /// Equivalent to `jit/show_head.rb`
     ShowHead { oid: Option<Digest> },
 
+    /// List, create, or delete branches
     Branch {
-        name: Option<String>,
-        #[clap(short = 'D', long)]
+        #[clap(num_args(1..))]
+        patterns: Vec<String>,
+        #[clap(short = 'd', long)]
         delete: bool,
+        #[clap(short, long)]
+        list: bool,
+        #[clap(short, long)]
+        force: bool,
     },
 }
 
@@ -68,7 +78,7 @@ pub enum CatFile {
     #[clap(short_flag = 'p')]
     PrettyPrint {
         #[clap(value_name = "object")]
-        object: Digest,
+        object_ref: String,
     },
 
     /// Print the type of `object` to stdout
@@ -99,6 +109,8 @@ pub struct Opt {
     #[clap(subcommand)]
     pub command: Command,
 
+    /// How verbose the tracing output should be. Multiple flags increase verbosity. Note that this
+    /// is overeridden by the `RUST_LOG` environment variable.
     #[clap(short, long, action(ArgAction::Count))]
     pub verbose: u8,
 

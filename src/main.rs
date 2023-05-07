@@ -14,14 +14,16 @@ mod interface;
 mod repo;
 mod revision;
 mod storable;
+mod timestamp;
 mod tree;
 mod util;
 
 use camino::Utf8PathBuf;
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{eyre, Context};
 pub use color_eyre::Result;
 use repo::diff::DiffMode;
 use repo::status::StatusOutputMode;
+use revision::Rev;
 use tracing::{info, Level};
 use tracing_subscriber::fmt::Subscriber;
 use tracing_subscriber::EnvFilter;
@@ -38,30 +40,19 @@ static ARGS: Lazy<Opt> = Lazy::new(Opt::parse);
 fn main() -> Result<()> {
     color_eyre::install().unwrap();
 
-    match ARGS.verbose {
-        0 => {
-            let subscriber = Subscriber::builder()
-                .with_env_filter(EnvFilter::from_default_env())
-                .finish();
-            tracing::subscriber::set_global_default(subscriber)?;
-        }
-        1 => {
-            let subscriber = Subscriber::builder()
-                .with_env_filter(EnvFilter::from_default_env())
-                .with_max_level(Level::INFO)
-                .finish();
-            tracing::subscriber::set_global_default(subscriber)?;
-            info!("Verbosity level: INFO (1)");
-        }
-        x => {
-            let subscriber = Subscriber::builder()
-                .with_env_filter(EnvFilter::from_default_env())
-                .with_max_level(Level::TRACE)
-                .finish();
-            tracing::subscriber::set_global_default(subscriber)?;
-            info!("Verbosity level: TRACE ({x})");
-        }
+    let level = match ARGS.verbose {
+        0 => Level::WARN,
+        1 => Level::INFO,
+        _ => Level::TRACE,
     };
+
+    let subscriber = Subscriber::builder()
+        .with_max_level(level)
+        .with_env_filter(EnvFilter::from_default_env())
+        .finish();
+    tracing::subscriber::set_global_default(subscriber)?;
+
+    info!("Verbosity level: {} ({})", level, ARGS.verbose);
 
     Lazy::force(&ARGS);
 
@@ -75,15 +66,15 @@ fn main() -> Result<()> {
         }
     };
 
-    if matches!(ARGS.command, Command::Init) {
-        Repo::init(&path)?;
+    if let Command::Init { branch_name } = &ARGS.command {
+        Repo::init(&path, branch_name)?;
         return Ok(());
     }
 
     let mut repo = Repo::open(path)?;
 
     match &ARGS.command {
-        Command::Init => unreachable!("Init command is handled above"),
+        Command::Init { .. } => unreachable!("Init command is handled above"),
 
         Command::Commit { message } => {
             let commit_id = repo.commit(
@@ -124,7 +115,33 @@ fn main() -> Result<()> {
 
         Command::ShowHead { oid } => repo.show_head(oid.clone())?,
 
-        Command::Branch { name, delete } => repo.branch(name.as_deref(), *delete)?,
+        #[allow(unused_variables)]
+        Command::Branch {
+            patterns,
+            delete,
+            list,
+            force,
+        } => {
+            match patterns.as_slice() {
+                [] => todo!("List branches"),
+
+                [name] => {
+                    // FIXME: don't explode on a just-inited repo
+                    let head = repo
+                        .read_head()?
+                        .ok_or_else(|| eyre!("Repo does not have a HEAD"))?;
+
+                    repo.create_branch(name, &head)?
+                }
+                [name, rev] => {
+                    let rev = Rev::parse(rev)?
+                        .resolve(&repo)?
+                        .ok_or_else(|| eyre!("Provided revision does not exist: '{}'", rev))?;
+                    repo.create_branch(name, &rev)?
+                }
+                _ => todo!("catch this with clap?"),
+            }
+        }
     };
 
     Ok(())

@@ -16,7 +16,7 @@ fn test_dir_replaces_file() -> Result<()> {
     let root = root.path();
     let root = Utf8Path::from_path(root).unwrap();
 
-    Repo::init(root)?;
+    Repo::init_default(root)?;
     let mut repo = Repo::open(root.to_owned())?;
 
     crate::create_test_files!(root, ["file1", "file2"]);
@@ -51,7 +51,7 @@ fn test_file_replaces_dir() -> Result<()> {
     let root = root.path();
     let root = Utf8Path::from_path(root).unwrap();
 
-    Repo::init(root)?;
+    Repo::init_default(root)?;
     let mut repo = Repo::open(root.to_owned())?;
 
     crate::create_test_files!(root, ["file1/file2/file3", "file1/file2/file4", "file5"]);

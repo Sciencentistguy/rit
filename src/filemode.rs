@@ -23,17 +23,28 @@ impl std::fmt::Octal for FileMode {
     }
 }
 
+impl std::fmt::Display for FileMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let x = match self {
+            FileMode::Directory => Self::DIRECTORY,
+            FileMode::Executable => Self::EXECUTABLE,
+            FileMode::Regular => Self::REGULAR,
+        };
+        write!(f, "{:06o}", x)
+    }
+}
+
 impl FileMode {
     const DIRECTORY: mode_t = 0o040000;
     const EXECUTABLE: mode_t = 0o100755;
     const REGULAR: mode_t = 0o100644;
 
-    pub fn inner(&self) -> mode_t {
-        match self {
+    pub fn inner(&self) -> u32 {
+        (match self {
             FileMode::Directory => FileMode::DIRECTORY,
             FileMode::Executable => FileMode::EXECUTABLE,
             FileMode::Regular => FileMode::REGULAR,
-        }
+        }) as _
     }
 
     /// Returns `true` if the file mode is [`Executable`].

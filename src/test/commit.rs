@@ -31,6 +31,7 @@ fn commit() -> Result<()> {
     let dir_rit = TempDir::new("")?;
     let dir_rit = dir_rit.path();
     let dir_rit = Utf8Path::from_path(dir_rit).unwrap();
+    println!("dir: {dir_rit}");
     let dir_git = TempDir::new("")?;
     let dir_git = dir_git.path();
     let dir_git = Utf8Path::from_path(dir_git).unwrap();
@@ -47,7 +48,7 @@ fn commit() -> Result<()> {
         "commit.gpgsign=false",
     ];
 
-    Repo::init(dir_rit)?;
+    Repo::init_default(dir_rit)?;
     let mut rit_repo = Repo::open(dir_rit.to_owned())?;
     write_test_files(dir_rit)?;
     rit_repo.add_all()?;
@@ -160,7 +161,7 @@ pub(super) fn commit_file_hierarchy() -> Result<()> {
         "commit.gpgsign=false",
     ];
 
-    Repo::init(dir_rit)?;
+    Repo::init_default(dir_rit)?;
     let mut rit_repo = Repo::open(dir_rit.to_owned())?;
 
     // Test files:

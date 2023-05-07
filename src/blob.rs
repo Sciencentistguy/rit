@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crate::storable::Storable;
 
 pub struct Blob {
@@ -26,6 +28,14 @@ impl Blob {
 
     pub fn into_data(self) -> Vec<u8> {
         self.data
+    }
+
+    /// Pretty-printing a blob is simple - just dump the contents of the file to stdout
+    pub fn pretty_print(&self) -> std::io::Result<()> {
+        let mut stdout = std::io::stdout().lock();
+        stdout.write_all(&self.data)?;
+        stdout.flush()?;
+        Ok(())
     }
 }
 

@@ -8,7 +8,7 @@ use color_eyre::Result;
 use once_cell::sync::OnceCell;
 use tracing::*;
 
-use crate::{filemode::FileMode, index::IndexEntry, util::Descends, Digest};
+use crate::{filemode::FileMode, index::IndexEntry, storable::Storable, util::Descends, Digest};
 
 #[derive(Debug)]
 pub enum TreeEntry {
@@ -46,6 +46,13 @@ impl TreeEntry {
             Some(v)
         } else {
             None
+        }
+    }
+
+    const fn kind(&self) -> &'static str {
+        match self {
+            TreeEntry::File(_) | TreeEntry::IncompleteFile { .. } => "blob",
+            TreeEntry::Directory { .. } => "tree",
         }
     }
 }
@@ -213,5 +220,23 @@ impl Tree {
         }
 
         Iter::new(self)
+    }
+
+    pub fn pretty_print(&self) -> std::io::Result<()> {
+        for (name, entry) in &self.entries {
+            if let TreeEntry::Directory { tree, .. } = entry {
+                let _ = tree.format(); // force the tree to caluclate all its oids
+            }
+            println!(
+                "{} {} {:x}\t{name}",
+                entry.mode(),
+                entry.kind(),
+                entry
+                    .oid()
+                    .expect("tree loaded from disk should have oid set")
+            );
+        }
+
+        Ok(())
     }
 }

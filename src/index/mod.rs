@@ -1,6 +1,7 @@
 mod parse;
 mod write;
 
+use bstr::ByteSlice;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::HashSet;
 
@@ -17,9 +18,21 @@ struct IndexHeader {
     num_entries: u32,
 }
 
+impl std::fmt::Debug for IndexHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IndexHeader")
+            .field("magic", &self.magic.to_os_str().unwrap())
+            .field("version", &self.version)
+            .field("num_entries", &self.num_entries)
+            .finish()
+    }
+}
+
 impl IndexHeader {
+    const MAGIC: &'static [u8; 4] = b"DIRC";
+
     fn has_valid_magic(&self) -> bool {
-        &self.magic == b"DIRC"
+        &self.magic == Self::MAGIC
     }
 }
 
@@ -186,7 +199,8 @@ impl IndexWrapper {
         self.entries.sort_unstable();
     }
 
-    pub fn write_out(&self) -> Result<()> {
+    /// Write out this index to the filesystem. This will overwrite the existing index
+    pub fn flush(&self) -> Result<()> {
         let index = Index::from_entries(&self.entries);
         let index = write::write_index(&index);
         std::fs::write(&self.path, index)?;
@@ -244,6 +258,8 @@ mod tests {
     use crate::repo::Repo;
     use crate::Result;
 
+    use pretty_assertions::assert_eq;
+
     #[test]
     #[ignore = "Doesn't work in CI"]
     /// Parse an index from the filesystem and write it back out. The generated file should be
@@ -292,7 +308,7 @@ mod tests {
         std::fs::set_permissions(dir.join("file2"), Permissions::from_mode(0o100755))?;
         std::fs::set_permissions(dir.join("file3"), Permissions::from_mode(0o100655))?;
 
-        Repo::init(dir)?;
+        Repo::init_default(dir)?;
         let mut rit_repo = Repo::open(dir.to_owned())?;
         rit_repo.add_all()?;
         let rit_index = std::fs::read(dir.join(".git/index"))?;

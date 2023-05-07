@@ -15,6 +15,10 @@ impl super::Repo {
         if let Some(contents) = contents.strip_prefix("ref: ") {
             let path = self.git_dir.join(contents);
             if !path.exists() {
+                if !self.database.any(|item| item.is_commit())? {
+                    // an empty repo can have a dangling HEAD and that is fine
+                    return Ok(None);
+                }
                 Err(eyre!("HEAD points to non-existstant ref: {}", path))
             } else {
                 let contents = std::fs::read_to_string(path)?;

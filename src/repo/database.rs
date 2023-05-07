@@ -94,7 +94,38 @@ impl Database {
         object_path.exists()
     }
 
-    pub fn read_to_vec(&self, oid: &Digest) -> Result<Vec<u8>> {
+    pub fn any<F>(&self, key: F) -> Result<bool>
+    where
+        F: Fn(&LoadedItem) -> bool,
+    {
+        for dir in self.database_root.read_dir().unwrap() {
+            let dir = dir.unwrap();
+            if !dir.file_type().unwrap().is_dir() {
+                continue;
+            }
+            for file in dir.path().read_dir().unwrap() {
+                let file = file.unwrap();
+                if !file.file_type().unwrap().is_file() {
+                    continue;
+                }
+                let item = self
+                    .load(&Digest::from_str(&format!(
+                        "{}{}",
+                        dir.file_name().to_str().unwrap(),
+                        file.file_name().to_str().unwrap(),
+                    ))?)
+                    .unwrap();
+                if key(&item) {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// Read an item from the database to a Vec<u8>. The returned Vec contains uncompressed but
+    /// unparsed data.
+    pub fn read_uncompressed(&self, oid: &Digest) -> Result<Vec<u8>> {
         trace!(object=%oid.to_hex(), "reading object from database");
 
         let object_path = self.object_path(oid);
@@ -114,21 +145,20 @@ impl Database {
         Ok(decompressed)
     }
 
+    /// Read an item from the database, and parse it into a `LoadedItem`.
+    ///
     pub fn load(&self, oid: &Digest) -> Result<LoadedItem> {
-        let mut bytes = self.read_to_vec(oid)?;
+        let mut bytes = self.read_uncompressed(oid)?;
 
-        let space_idx = memchr::memchr(b' ', &bytes).unwrap();
         let nul_idx = memchr::memchr(b'\0', &bytes).unwrap();
-        let r#type = &bytes[..space_idx];
-        debug_assert!({
-            let len = &bytes[space_idx + 1..nul_idx];
-            let len = std::str::from_utf8(len)?;
-            len.parse::<usize>()? > 0
-        });
+        let header = &bytes[..nul_idx];
+        let header = DBHeader::from_bytes(header)?;
+
+        debug_assert!(header.len > 0);
 
         let content_start = nul_idx + 1;
 
-        match r#type {
+        match header.type_string {
             b"blob" => {
                 bytes.drain(0..content_start);
                 Ok(LoadedItem::Blob(Blob::new(bytes)))
@@ -142,7 +172,10 @@ impl Database {
                 let bytes = &bytes[content_start..];
                 Ok(LoadedItem::Commit(Commit::parse(bytes)?))
             }
-            _ => unreachable!("Unexpected object type: {}", std::str::from_utf8(r#type)?),
+            type_string => unreachable!(
+                "Unexpected object type: {}",
+                String::from_utf8_lossy(type_string)
+            ),
         }
     }
 
@@ -177,6 +210,53 @@ impl Database {
 
         Ok(candidates)
     }
+
+    /// Returns a vec of all objects in the database
+    pub fn entries(&self) -> Vec<Digest> {
+        let mut entries = Vec::new();
+
+        for dir in self.database_root.read_dir().unwrap() {
+            let dir = dir.unwrap();
+            let dir = Utf8PathBuf::from_path_buf(dir.path()).unwrap();
+            if dir.file_name().unwrap() == "pack" {
+                continue;
+            }
+            for file in dir.read_dir().unwrap() {
+                let file = file.unwrap();
+                let file = Utf8PathBuf::from_path_buf(file.path()).unwrap();
+                let name = file.file_name().unwrap();
+                // XXX: Work out how to parse digests without allocating
+                let oid =
+                    Digest::from_str(&format!("{}{}", dir.file_name().unwrap(), name)).unwrap();
+                entries.push(oid);
+            }
+        }
+
+        entries
+    }
+}
+
+/// The header of database entry
+/// An item header consists of a type string, a space, the size of the object in bytes,
+/// terminated with a `b'0'`.
+#[derive(Debug)]
+struct DBHeader<'a> {
+    type_string: &'a [u8],
+    len: usize,
+}
+
+impl<'a> DBHeader<'a> {
+    /// Parse a DBHeader from a slice of bytes. The slice must end before the first `b'\0'` byte.
+    fn from_bytes(bytes: &'a [u8]) -> Result<Self> {
+        let space_idx = memchr::memchr(b' ', bytes).unwrap();
+
+        let type_string = &bytes[..space_idx];
+        let len = &bytes[space_idx + 1..];
+        let len = std::str::from_utf8(len)?;
+        let len = len.parse::<usize>()?;
+
+        Ok(DBHeader { type_string, len })
+    }
 }
 
 pub enum LoadedItem {
@@ -207,6 +287,19 @@ impl LoadedItem {
             Some(v)
         } else {
             None
+        }
+    }
+
+    /// Return a string representation of type of the object.
+    pub const fn kind(&self) -> &'static str {
+        const COMMIT: &str = "commit";
+        const TREE: &str = "tree";
+        const BLOB: &str = "blob";
+
+        match self {
+            LoadedItem::Commit(_) => COMMIT,
+            LoadedItem::Tree(_) => TREE,
+            LoadedItem::Blob(_) => BLOB,
         }
     }
 
@@ -285,7 +378,7 @@ mod tests {
         let root = root.path();
         let root = Utf8Path::from_path(root).unwrap();
 
-        Repo::init(root)?;
+        Repo::init_default(root)?;
         let mut repo = Repo::open(root.to_owned())?;
 
         crate::create_test_files!(root, ["file1"]);

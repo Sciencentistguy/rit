@@ -3,38 +3,10 @@ mod write;
 
 use crate::digest::Digest;
 use crate::repo::Repo;
+use crate::timestamp::Timestamp;
 use crate::Result;
 
 struct GpgSig;
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-struct Timestamp {
-    unix: u64,
-    offset: i64,
-}
-
-impl Timestamp {
-    pub fn now() -> Self {
-        let unix = chrono::offset::Local::now()
-            .timestamp()
-            .try_into()
-            .expect("Time should be positive");
-        let offset_seconds = chrono::offset::Local::now().offset().utc_minus_local() as i64;
-        let offset_hours = offset_seconds / 60;
-        let offset = offset_hours * 100;
-
-        Self { unix, offset }
-    }
-
-    fn format(&self) -> String {
-        format!(
-            "{} {}{:04}",
-            self.unix,
-            if self.offset.is_negative() { '-' } else { '+' },
-            self.offset.abs()
-        )
-    }
-}
 
 #[derive(Debug, Clone)]
 struct Signature {
@@ -101,5 +73,33 @@ impl Commit {
 
     pub fn message(&self) -> &str {
         self.message.as_ref()
+    }
+
+    pub fn pretty_print(&self) -> std::io::Result<()> {
+        println!("tree {:x}", self.tree_id);
+        for parent in &self.parents {
+            println!("parent {parent:x}");
+        }
+        println!(
+            "author {} <{}> {}",
+            self.author.name, self.author.email, self.author.when
+        );
+        println!(
+            "committer {} <{}> {}",
+            self.committer.name, self.committer.email, self.committer.when
+        );
+
+        if let Some(_gpgsig) = &self.gpgsig {
+            println!("gpgsig [not yet implemented]");
+        }
+        println!();
+
+        println!("{}", self.message);
+
+        Ok(())
+    }
+
+    pub(crate) fn commit_date(&self) -> chrono::NaiveDate {
+        self.committer.when.0.date_naive()
     }
 }

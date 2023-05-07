@@ -36,7 +36,7 @@ impl Descends for Utf8Path {
     }
 }
 
-pub fn align_to(n: usize, num: usize) -> usize {
+pub const fn align_to(n: usize, num: usize) -> usize {
     let extra = num % n;
     match extra {
         0 => num,
