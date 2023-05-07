@@ -1,7 +1,9 @@
 mod parse;
 mod write;
 
-use chrono::FixedOffset;
+use std::fmt::Display;
+
+use chrono::NaiveDateTime;
 
 use crate::digest::Digest;
 use crate::repo::Repo;
@@ -101,7 +103,7 @@ impl Commit {
         Ok(())
     }
 
-    pub(crate) fn commit_date(&self) -> chrono::Date<FixedOffset> {
-        self.committer.when.0.date()
+    pub(crate) fn commit_date(&self) -> chrono::NaiveDate {
+        self.committer.when.0.date_naive()
     }
 }
