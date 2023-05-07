@@ -10,4 +10,4 @@ workflows:
     jobs:
       - rust/lint-test-build:
           release: true
-          version: "1.62.1"
+          version: "1.69.0"
