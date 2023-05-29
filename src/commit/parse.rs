@@ -183,7 +183,7 @@ mod tests {
                 .unwrap()
                 .and_hms_opt(11, 16, 59)
                 .unwrap();
-            let offset = FixedOffset::east(60 * 60 /*1 hour*/);
+            let offset = FixedOffset::east_opt(60 * 60 /*1 hour*/).unwrap();
             DateTime::<FixedOffset>::from_local(ndt, offset)
         };
 
