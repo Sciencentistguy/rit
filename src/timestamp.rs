@@ -8,7 +8,7 @@ pub struct Timestamp(pub DateTime<FixedOffset>);
 
 impl Timestamp {
     pub fn now() -> Self {
-        Self(chrono::offset::Local::now().into())
+        Self(chrono::offset::Local::now().fixed_offset())
     }
     /// Parse a timestamp from a unix + HH + mm offset
     pub fn from_git(s: &str) -> Result<Self> {
