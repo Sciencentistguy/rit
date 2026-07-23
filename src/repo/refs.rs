@@ -98,7 +98,7 @@ impl super::Repo {
     }
 
     fn path_for_ref(&self, name: &str) -> Option<Utf8PathBuf> {
-        if name == "HEAD" {
+        if name == "HEAD" || name == "@" {
             return Some(self.head_path.clone());
         }
 

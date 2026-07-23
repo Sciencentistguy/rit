@@ -2,48 +2,70 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    crane.url = "github:ipetkov/crane";
-    crane.inputs.nixpkgs.follows = "nixpkgs";
+    flake-compat = {
+      url = "github:edolstra/flake-compat";
+      flake = false;
+    };
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
   outputs = {
     self,
     nixpkgs,
     flake-utils,
-    crane,
+    fenix,
     ...
   }:
-    {
-      overlay = final: prev: {
-        rit = self.packages.${prev.system}.default;
+    flake-utils.lib.eachDefaultSystem (system: let
+      pkgs = import nixpkgs {
+        config.allowUnfree = true;
+        inherit system;
       };
-    }
-    // flake-utils.lib.eachDefaultSystem (
-      system: let
-        pkgs = nixpkgs.legacyPackages.${system};
+      inherit (pkgs) lib;
+      fenixStable = fenix.packages.${system}.stable;
+      rustToolchain = fenixStable.toolchain;
+      rustPlatform = pkgs.makeRustPlatform {
+        cargo = rustToolchain;
+        rustc = rustToolchain;
+      };
 
-        craneLib = crane.lib.${system};
-
-        rit = craneLib.buildPackage {
+      rit = {
+        rustPlatform,
+        lib,
+      }:
+        rustPlatform.buildRustPackage {
           name = "rit";
-          src = craneLib.cleanCargoSource ./.;
-          buildInputs = with pkgs; [git]; # for tests
-        };
-      in {
-        packages.rit = rit;
+          src = lib.cleanSource ./.;
 
-        packages.default = self.packages.${system}.rit;
-        devShells.default = self.packages.${system}.default.overrideAttrs (super: {
-          nativeBuildInputs = with pkgs;
-            super.nativeBuildInputs
-            ++ [
-              cargo-edit
-              cargo-flamegraph
-              clippy
-              rustc
-              rustfmt
-            ];
-          RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
-        });
-      }
-    );
+          cargoLock.lockFile = ./Cargo.lock;
+
+          buildInputs = with pkgs; (
+            [
+            ]
+            ++ lib.optionals (stdenv.isDarwin) [
+              libiconv
+            ]
+          );
+
+          meta = with lib; {
+            license = licenses.mpl20;
+            homepage = "https://github.com/Sciencentistguy/rit";
+          };
+        };
+    in rec {
+      packages.rit = pkgs.callPackage rit {
+        inherit rustPlatform;
+      };
+
+      packages.default = self.packages.${system}.rit;
+
+      devShells.default = pkgs.mkShell {
+        inputsFrom = [
+          packages.rit
+        ];
+        RUST_SRC_PATH = "${fenixStable.rust-src}/lib/rustlib/src/rust/library";
+      };
+    });
 }
