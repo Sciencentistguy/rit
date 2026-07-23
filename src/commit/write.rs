@@ -1,24 +1,23 @@
+use std::fmt::Write;
+
 use crate::storable::Storable;
 
-use tracing::warn;
-
+// NOTE: non-utf8 in commit messages or author names will destroy the world
 impl Storable for super::Commit {
     fn format(&self) -> Vec<u8> {
-        let data = format!(
+        let mut data = format!("tree {}\n", self.tree_id.to_hex());
+
+        for parent in &self.parents {
+            writeln!(&mut data, "parent {parent:x}").unwrap();
+        }
+
+        write!(
+            &mut data,
             "\
-            tree {}\n\
-            {}\
             author {} <{}> {}\n\
             committer {} <{}> {}\n\
             \n\
             {}",
-            self.tree_id.to_hex(),
-            if let Some(parent) = self.parents.first() {
-                warn!("Only writing first parent, NYI");
-                format!("parent {parent:x}\n")
-            } else {
-                String::new()
-            },
             self.author.name,
             self.author.email,
             self.author.when,
@@ -26,12 +25,16 @@ impl Storable for super::Commit {
             self.committer.email,
             self.committer.when,
             self.message
-        );
-        let mut formatted = Vec::new();
-        formatted.extend_from_slice(b"commit ");
-        formatted.extend_from_slice(format!("{}", data.len()).as_bytes());
-        formatted.push(b'\0');
-        formatted.extend_from_slice(data.as_bytes());
-        formatted
+        )
+        .unwrap();
+
+        if !data.ends_with('\n') {
+            data.push('\n');
+        }
+
+        let prefix = format!("commit {}\0", data.len());
+        data.insert_str(0, &prefix);
+
+        data.into_bytes()
     }
 }

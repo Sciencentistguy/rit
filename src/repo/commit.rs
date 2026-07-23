@@ -21,8 +21,8 @@ impl super::Repo {
 
         let parent_commit = self.read_head().unwrap();
 
-        let name = std::env::var("RIT_AUTHOR_NAME").unwrap();
-        let email = std::env::var("RIT_AUTHOR_EMAIL").unwrap();
+        let name = std::env::var("RIT_AUTHOR_NAME").expect("RIT_AUTHOR_NAME should be set");
+        let email = std::env::var("RIT_AUTHOR_EMAIL").expect("RIT_AUTHOR_EMAIL should be set");
 
         let commit = Commit::new(
             parent_commit,
