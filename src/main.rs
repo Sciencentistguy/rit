@@ -11,6 +11,7 @@ mod digest;
 mod filemode;
 mod index;
 mod interface;
+mod lockfile;
 mod repo;
 mod revision;
 mod storable;

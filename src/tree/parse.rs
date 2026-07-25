@@ -24,7 +24,7 @@ mod nom {
 
     /// Parses an entry from the tree. Lines are of the form
     /// `<mode> <name>\0<oid>`
-    pub(super) fn parse_tree_entry(i: Input) -> Result<(FileMode, &str, Digest)> {
+    pub(super) fn parse_tree_entry(i: Input<'_>) -> Result<'_, (FileMode, &str, Digest)> {
         let (i, mode) = nom::bytes::complete::take_until(" ").parse(i)?;
         let (i, _) = nom::bytes::complete::tag(" ").parse(i)?;
         let (i, name) = nom::bytes::complete::take_until("\0").parse(i)?;

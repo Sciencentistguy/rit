@@ -261,7 +261,7 @@ impl<'a> Hunk<'a> {
         (start, lines)
     }
 
-    pub fn edits(&self) -> &[Edit] {
+    pub fn edits(&self) -> &[Edit<'_>] {
         self.edits.as_ref()
     }
 }

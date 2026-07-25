@@ -8,6 +8,7 @@ use tap::Tap;
 use tracing::trace;
 
 use crate::digest::Digest;
+use crate::lockfile::Lockfile;
 use crate::repo::database::LoadedItem;
 use crate::revision::is_valid_ref_name;
 use crate::Result;
@@ -33,14 +34,12 @@ impl super::Repo {
     }
 
     /// Set the value of a ref file to the specified oid.
-    ///
-    /// This function does not use git locks. This creates a possible issue when multiple processes
-    /// (realistically, git and rit) are contending a head file. The solution to this is to Just
-    /// Not run rit while a git process is running.
     fn update_ref_file(&self, path: &Utf8Path, oid: &Digest) -> Result<()> {
         trace!(%path, ?oid, "Updating ref");
-        let mut file = File::create(path)?;
-        writeln!(&mut file, "{oid:x}")?;
+        let mut lf = Lockfile::new(&path);
+        let mut guard = lf.lock();
+
+        writeln!(&mut guard, "{oid:x}")?;
         Ok(())
     }
 
