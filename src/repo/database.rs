@@ -11,6 +11,7 @@ use std::io::Read;
 use std::io::Write;
 use std::str::FromStr;
 
+use bstr::ByteSlice;
 use camino::{Utf8Path, Utf8PathBuf};
 use color_eyre::eyre::eyre;
 use flate2::read::ZlibDecoder;
@@ -35,6 +36,8 @@ impl Database {
 
         let object_path = self.object_path(obj.oid());
 
+        // A content addressed DB means that if the filename exists, the data we're writing is the
+        // same (modulo sha1 collisions, I guess)
         if object_path.exists() {
             return Ok(());
         }
@@ -238,7 +241,7 @@ impl Database {
 
 /// The header of database entry
 /// An item header consists of a type string, a space, the size of the object in bytes,
-/// terminated with a `b'0'`.
+/// terminated with a `b'\0'`.
 #[derive(Debug)]
 struct DBHeader<'a> {
     type_string: &'a [u8],
@@ -248,10 +251,11 @@ struct DBHeader<'a> {
 impl<'a> DBHeader<'a> {
     /// Parse a DBHeader from a slice of bytes. The slice must end before the first `b'\0'` byte.
     fn from_bytes(bytes: &'a [u8]) -> Result<Self> {
-        let space_idx = memchr::memchr(b' ', bytes).unwrap();
+        debug_assert!(!bytes.contains(&b'\0'));
+        let (type_string, len) = bytes
+            .split_once_str(b" ")
+            .expect("DBHeader should contain a ' '");
 
-        let type_string = &bytes[..space_idx];
-        let len = &bytes[space_idx + 1..];
         let len = std::str::from_utf8(len)?;
         let len = len.parse::<usize>()?;
 

@@ -7,6 +7,7 @@ use tracing::warn;
 ///  - regular files (0o100644)
 ///  - executable files (0o100755)
 ///  - directories (0o040000)
+///  - symlinks (0o120000)
 ///
 /// As fewer than 256 states are actually represented, we can save 3 bytes by not storing the whole
 /// mode as a `mode_t`. Ensure that
@@ -15,6 +16,7 @@ pub enum FileMode {
     Directory,
     Executable,
     Regular,
+    Symlink,
 }
 
 impl std::fmt::Octal for FileMode {
@@ -29,6 +31,7 @@ impl std::fmt::Display for FileMode {
             FileMode::Directory => Self::DIRECTORY,
             FileMode::Executable => Self::EXECUTABLE,
             FileMode::Regular => Self::REGULAR,
+            FileMode::Symlink => Self::SYMLINK,
         };
         write!(f, "{:06o}", x)
     }
@@ -38,12 +41,14 @@ impl FileMode {
     const DIRECTORY: mode_t = 0o040000;
     const EXECUTABLE: mode_t = 0o100755;
     const REGULAR: mode_t = 0o100644;
+    const SYMLINK: mode_t = 0o120000;
 
     pub fn inner(&self) -> u32 {
         (match self {
             FileMode::Directory => FileMode::DIRECTORY,
             FileMode::Executable => FileMode::EXECUTABLE,
             FileMode::Regular => FileMode::REGULAR,
+            FileMode::Symlink => Self::SYMLINK,
         }) as _
     }
 
@@ -62,6 +67,7 @@ impl From<mode_t> for FileMode {
             FileMode::DIRECTORY => FileMode::Directory,
             FileMode::REGULAR => FileMode::Regular,
             FileMode::EXECUTABLE => FileMode::Executable,
+            FileMode::SYMLINK => FileMode::Symlink,
             actual_mode => {
                 warn!(
                     mode=?actual_mode,

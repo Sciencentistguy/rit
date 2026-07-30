@@ -1,10 +1,10 @@
 mod parse;
 mod write;
 
-use bstr::ByteSlice;
-use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::HashSet;
 
+use bstr::ByteSlice;
+use camino::{Utf8Path, Utf8PathBuf};
 use tracing::trace;
 
 use crate::digest::Digest;
@@ -88,7 +88,7 @@ impl Ord for IndexEntry {
 }
 impl PartialOrd for IndexEntry {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.name.partial_cmp(&other.name)
+        Some(self.cmp(other))
     }
 }
 
@@ -247,6 +247,8 @@ impl IndexWrapper {
 
 #[cfg(test)]
 mod tests {
+    use test_log::test;
+
     use std::fs::Permissions;
     use std::os::unix::prelude::PermissionsExt;
     use std::process::{Command, Stdio};

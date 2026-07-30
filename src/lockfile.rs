@@ -1,5 +1,9 @@
 use std::{
-    borrow::{Borrow, BorrowMut}, fs::{File, OpenOptions}, io::ErrorKind, ops::{Deref, DerefMut}, path::{Path, PathBuf}, time::Duration
+    fs::File,
+    io::ErrorKind,
+    ops::{Deref, DerefMut},
+    path::{Path, PathBuf},
+    time::Duration,
 };
 
 pub struct Lockfile<'a> {
@@ -9,10 +13,7 @@ pub struct Lockfile<'a> {
     file: Option<File>,
 }
 
-pub struct Guard<'a, 'b>
-where
-    'a: 'b,
-{
+pub struct Guard<'a, 'b> {
     parent: &'b mut Lockfile<'a>,
 }
 
@@ -29,18 +30,6 @@ impl Deref for Guard<'_, '_> {
         self.parent.file.as_ref().unwrap()
     }
 }
-
-// impl BorrowMut<File> for Guard<'_, '_> {
-    // fn borrow_mut(&mut self) -> &mut File {
-        // self.parent.file.as_mut().unwrap()
-    // }
-// }
-
-// impl Borrow<File> for Guard<'_, '_> {
-    // fn borrow(&self) -> &File {
-        // self.parent.file.as_ref().unwrap()
-    // }
-// }
 
 impl Drop for Guard<'_, '_> {
     fn drop(&mut self) {
@@ -63,21 +52,22 @@ impl<'a> Lockfile<'a> {
     }
 
     pub fn try_lock(&mut self) -> Option<Guard<'a, '_>> {
-        let mut lf = OpenOptions::new();
-        lf.write(true);
-        lf.create_new(true);
-        let mut oo = OpenOptions::new();
-        oo.write(true);
-        oo.create(true);
-        match lf.open(&self.path) {
+        match File::create_new(&self.path) {
             Ok(x) => {
                 self.lockfile = Some(x);
-                self.file = Some(oo.open(self.original_path).unwrap());
+                self.file = Some(
+                    File::create(self.original_path)
+                        .expect("Should be able to open/create target file"),
+                );
                 Some(Guard { parent: self })
             }
             Err(e) => match e.kind() {
                 ErrorKind::AlreadyExists => None,
-                _ => panic!("whoops other error: {e:?}"),
+                _ => panic!(
+                    "Unexpected filesystem error while locking {}: code {}",
+                    self.original_path.display(),
+                    e
+                ),
             },
         }
     }
