@@ -3,13 +3,26 @@ use crate::test::{COMMIT_EMAIL, COMMIT_NAME};
 use crate::*;
 
 use std::fs::Permissions;
-use std::io;
+use std::io::{self, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::process::{Command, Stdio};
 
 use camino::Utf8Path;
+use flate2::read::ZlibDecoder;
 use pretty_assertions::assert_eq;
 use tempdir::TempDir;
+
+use test_log::test;
+
+fn decompress(bytes: &[u8]) -> Result<Vec<u8>> {
+    let mut d = ZlibDecoder::new(bytes);
+
+    let mut decompressed = Vec::new();
+
+    let _ = d.read_to_end(&mut decompressed)?;
+
+    Ok(decompressed)
+}
 
 #[test]
 /// Create two temporary directories. Create the same set of files in both. In one, use rit to
@@ -55,9 +68,9 @@ fn commit() -> Result<()> {
     let commit_id = rit_repo.commit("test")?;
 
     Command::new("git")
-        .args(&git_command_args)
+        .args(git_command_args)
         .arg("init")
-        .current_dir(&dir_git)
+        .current_dir(dir_git)
         .stdout(Stdio::null())
         .status()
         .unwrap();
@@ -65,18 +78,18 @@ fn commit() -> Result<()> {
     write_test_files(dir_git)?;
 
     Command::new("git")
-        .args(&git_command_args)
+        .args(git_command_args)
         .arg("add")
         .arg("--all")
-        .current_dir(&dir_git)
+        .current_dir(dir_git)
         .stdout(Stdio::null())
         .status()?;
     Command::new("git")
-        .args(&git_command_args)
+        .args(git_command_args)
         .arg("commit")
         .arg("-m")
         .arg("test")
-        .current_dir(&dir_git)
+        .current_dir(dir_git)
         .stdout(Stdio::null())
         .status()?;
 
@@ -92,15 +105,17 @@ fn commit() -> Result<()> {
 
     assert!(rit_dir.join(tree_path).exists());
     let tree_rit = std::fs::read(rit_dir.join(tree_path))?;
+    let tree_rit = decompress(&tree_rit).unwrap();
     let tree_git = std::fs::read(git_dir.join(tree_path))?;
+    let tree_git = decompress(&tree_git).unwrap();
     assert_eq!(tree_rit, tree_git);
 
     let generated_commit = String::from_utf8(
         Command::new("git")
             .arg("cat-file")
             .arg("-p")
-            .arg(&commit_id.to_hex())
-            .current_dir(&dir_rit)
+            .arg(commit_id.to_hex())
+            .current_dir(dir_rit)
             .output()?
             .stdout,
     )
@@ -117,7 +132,7 @@ fn commit() -> Result<()> {
                 .arg("cat-file")
                 .arg("-p")
                 .arg(&tree[5..])
-                .current_dir(&dir_rit)
+                .current_dir(dir_rit)
                 .output()?
                 .stdout,
         )
@@ -171,9 +186,9 @@ pub(super) fn commit_file_hierarchy() -> Result<()> {
     let commit_id = rit_repo.commit("test")?;
 
     Command::new("git")
-        .args(&git_command_args)
+        .args(git_command_args)
         .arg("init")
-        .current_dir(&dir_git)
+        .current_dir(dir_git)
         .stdout(Stdio::null())
         .status()
         .unwrap();
@@ -181,18 +196,18 @@ pub(super) fn commit_file_hierarchy() -> Result<()> {
     crate::create_test_files!(dir_git, ["a/b/c.txt"]);
 
     Command::new("git")
-        .args(&git_command_args)
+        .args(git_command_args)
         .arg("add")
         .arg("--all")
-        .current_dir(&dir_git)
+        .current_dir(dir_git)
         .stdout(Stdio::null())
         .status()?;
     Command::new("git")
-        .args(&git_command_args)
+        .args(git_command_args)
         .arg("commit")
         .arg("-m")
         .arg("test")
-        .current_dir(&dir_git)
+        .current_dir(dir_git)
         .stdout(Stdio::null())
         .status()?;
 
@@ -213,15 +228,17 @@ pub(super) fn commit_file_hierarchy() -> Result<()> {
 
     assert!(rit_dir.join(root_tree_path).exists());
     let tree_rit = std::fs::read(rit_dir.join(root_tree_path))?;
+    let tree_rit = decompress(&tree_rit).unwrap();
     let tree_git = std::fs::read(git_dir.join(root_tree_path))?;
+    let tree_git = decompress(&tree_git).unwrap();
     assert_eq!(tree_rit, tree_git);
 
     let generated_commit = String::from_utf8(
         Command::new("git")
             .arg("cat-file")
             .arg("-p")
-            .arg(&commit_id.to_hex())
-            .current_dir(&dir_rit)
+            .arg(commit_id.to_hex())
+            .current_dir(dir_rit)
             .output()?
             .stdout,
     )
