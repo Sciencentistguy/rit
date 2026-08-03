@@ -9,8 +9,8 @@ mod nom {
 
     use bstr::ByteSlice;
     use nom::{
-        bytes::complete::{tag, take, take_till, take_until, take_while},
         Parser,
+        bytes::complete::{tag, take, take_till, take_until, take_while},
     };
     use nom_supreme::ParserExt;
 
@@ -44,7 +44,7 @@ mod nom {
         ))
     }
 
-    fn parse_message(i: Input) -> Result<&[u8]> {
+    fn parse_message<'a>(i: Input<'a>) -> Result<'a, &'a [u8]> {
         let (i, _) = take_while(|x: u8| x.is_ascii_whitespace())(i)?;
         Ok((b"", i.trim()))
     }
@@ -183,8 +183,8 @@ mod tests {
                 .unwrap()
                 .and_hms_opt(11, 16, 59)
                 .unwrap();
-            let offset = FixedOffset::east(60 * 60 /*1 hour*/);
-            DateTime::<FixedOffset>::from_local(ndt, offset)
+            let offset = FixedOffset::east_opt(60 * 60 /*1 hour*/).unwrap();
+            ndt.and_local_timezone(offset).unwrap()
         };
 
         assert_eq!(signature.when.0, expected_ts,);

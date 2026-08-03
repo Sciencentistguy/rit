@@ -1,8 +1,8 @@
 use camino::Utf8Path;
 use tempdir::TempDir;
 
-use crate::repo::Repo;
 use crate::Result;
+use crate::repo::Repo;
 use pretty_assertions::assert_eq;
 
 #[test]

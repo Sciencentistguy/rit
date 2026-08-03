@@ -8,12 +8,12 @@
 use std::str::FromStr;
 
 use crate::{
-    digest::Digest,
-    repo::{database::LoadedItem, Repo},
     Result,
+    digest::Digest,
+    repo::{Repo, database::LoadedItem},
 };
 
-use color_eyre::eyre::{eyre, Context};
+use color_eyre::eyre::{Context, eyre};
 
 /// Contains all characters that cannot appear in a ref name.
 ///
@@ -381,14 +381,9 @@ mod evaluator_tests {
     use camino::Utf8Path;
     use tempdir::TempDir;
 
-    use crate::test::{COMMIT_EMAIL, COMMIT_NAME};
-
     use super::*;
 
     fn init_repo(dir: &Utf8Path) -> Result<Repo> {
-        std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
-        std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
-
         Repo::init_default(dir)?;
 
         crate::create_test_files!(dir, ["file0"]);

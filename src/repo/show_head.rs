@@ -1,4 +1,4 @@
-use crate::{digest::Digest, tree::Tree, Result};
+use crate::{Result, digest::Digest, tree::Tree};
 
 use camino::Utf8Path;
 use color_eyre::eyre::eyre;

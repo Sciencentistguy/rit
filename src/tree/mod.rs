@@ -8,7 +8,7 @@ use color_eyre::Result;
 use once_cell::sync::OnceCell;
 use tracing::*;
 
-use crate::{filemode::FileMode, index::IndexEntry, storable::Storable, util::Descends, Digest};
+use crate::{Digest, filemode::FileMode, index::IndexEntry, storable::Storable, util::Descends};
 
 #[derive(Debug)]
 pub enum TreeEntry {

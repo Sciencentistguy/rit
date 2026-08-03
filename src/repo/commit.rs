@@ -5,6 +5,7 @@ use crate::digest::Digest;
 use crate::storable::DatabaseObject;
 use crate::tree::Tree;
 use crate::Result;
+use crate::ARGS;
 
 impl super::Repo {
     pub fn commit(&mut self, message: &str) -> Result<Digest> {
@@ -12,7 +13,7 @@ impl super::Repo {
         let entries = &self.index.entries();
         let root = Tree::build(entries).unwrap();
         trace!("Traversing root");
-        root.traverse(|tree| self.database.store(&DatabaseObject::new(&*tree)))
+        root.traverse(|tree| self.database.store(&DatabaseObject::new(tree)))
             .unwrap();
 
         let root = DatabaseObject::new(&root);
@@ -21,14 +22,11 @@ impl super::Repo {
 
         let parent_commit = self.read_head().unwrap();
 
-        let name = std::env::var("RIT_AUTHOR_NAME").expect("RIT_AUTHOR_NAME should be set");
-        let email = std::env::var("RIT_AUTHOR_EMAIL").expect("RIT_AUTHOR_EMAIL should be set");
-
         let commit = Commit::new(
             parent_commit,
             root.into_oid(),
-            name,
-            email,
+            ARGS.author_name.clone(),
+            ARGS.author_email.clone(),
             message.to_owned(),
         );
 

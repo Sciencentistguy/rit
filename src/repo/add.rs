@@ -1,8 +1,8 @@
 use camino::Utf8PathBuf;
-use color_eyre::eyre::{eyre, Context};
+use color_eyre::eyre::{Context, eyre};
 use tracing::trace;
 
-use crate::{blob::Blob, storable::DatabaseObject, Result};
+use crate::{Result, blob::Blob, storable::DatabaseObject};
 
 impl super::Repo {
     /// Add paths to the index.
@@ -23,7 +23,7 @@ impl super::Repo {
                     &path
                 };
                 trace!(?path, "Adding file");
-                let abs_path = self.dir.join(&path);
+                let abs_path = self.dir.join(path);
 
                 let data = std::fs::read(&abs_path)
                     .wrap_err(format!("Failed to read file: {}", abs_path))?;

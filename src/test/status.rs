@@ -10,14 +10,10 @@ use crate::{
         status::{Change, Status},
         Repo,
     },
-    test::{COMMIT_EMAIL, COMMIT_NAME},
     Result,
 };
 
 fn init_repo(dir: &Utf8Path) -> Result<Repo> {
-    std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
-    std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
-
     crate::create_test_files!(dir, ["file1", "file2", "file3", "file4"]);
 
     Repo::init_default(dir)?;
@@ -141,7 +137,7 @@ fn test_change_file_preserve_size() -> Result<()> {
         let len = std::fs::File::open(dir.join("file1"))?.metadata()?.len();
         let mut new_contents: Vec<u8> = Vec::new();
         for _ in 0..len {
-            new_contents.push(thread_rng().gen());
+            new_contents.push(thread_rng().r#gen());
         }
         let mut file = std::fs::File::create(dir.join("file1"))?;
         file.write_all(&new_contents)?;
@@ -289,9 +285,6 @@ fn test_index_remove() -> Result<()> {
     let dir = TempDir::new("")?;
     let dir = dir.path();
     let dir = Utf8Path::from_path(dir).unwrap();
-
-    std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
-    std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
 
     Repo::init_default(dir)?;
 

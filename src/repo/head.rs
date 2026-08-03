@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
-use crate::digest::Digest;
 use crate::Result;
+use crate::digest::Digest;
 
-use color_eyre::eyre::{eyre, Context};
+use color_eyre::eyre::{Context, eyre};
 
 impl super::Repo {
     pub fn read_head(&self) -> Result<Option<Digest>> {

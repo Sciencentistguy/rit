@@ -1,10 +1,10 @@
 mod parse;
 mod write;
 
+use crate::Result;
 use crate::digest::Digest;
 use crate::repo::Repo;
 use crate::timestamp::Timestamp;
-use crate::Result;
 
 struct GpgSig;
 

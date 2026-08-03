@@ -3,13 +3,13 @@ use tap::Tap;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use crate::{
-    blob::Blob, diff::EditKind, digest::Digest, filemode::FileMode, index::IndexEntry,
-    storable::Storable, tree::Tree, Result,
+    Result, blob::Blob, diff::EditKind, digest::Digest, filemode::FileMode, index::IndexEntry,
+    storable::Storable, tree::Tree,
 };
 
 use super::{
-    status::{Change, Status},
     Repo,
+    status::{Change, Status},
 };
 
 pub enum DiffMode {

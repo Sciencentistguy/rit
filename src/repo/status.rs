@@ -1,7 +1,7 @@
+use crate::Result;
 use crate::index::IndexEntry;
 use crate::storable::DatabaseObject;
 use crate::tree::Tree;
-use crate::Result;
 use crate::{blob::Blob, tree::TreeEntry};
 
 use std::{collections::HashMap, fmt::Display, io::Write};
@@ -180,7 +180,6 @@ impl<'r: 'i, 'i> Status<'r, 'i> {
         }
     }
 
-    #[allow(clippy::blocks_in_if_conditions)]
     pub fn get_statuses(&self) -> Result<Vec<(&Utf8Path, Change)>> {
         let untracked = self.files.par_iter().filter_map(|path| {
             if !self.index.contains_key(&path.as_path()) {
@@ -197,10 +196,9 @@ impl<'r: 'i, 'i> Status<'r, 'i> {
                 Some((path, Change::Removed))
             } else if !self.head_tree.contains(entry.name()) {
                 Some((path, Change::IndexAdded))
-            } else if {
-                let tree_entry = self.head_tree.get_entry(entry.name()).unwrap();
-                tree_entry.oid() != entry.oid() || tree_entry.mode() != entry.mode()
-            } {
+            } else if let Some(tree_entry) = self.head_tree.get_entry(entry.name())
+                && (tree_entry.oid() != entry.oid() || tree_entry.mode() != entry.mode())
+            {
                 Some((path, Change::IndexModified))
             } else {
                 None

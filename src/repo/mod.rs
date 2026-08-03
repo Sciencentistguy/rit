@@ -16,8 +16,8 @@ use std::fs::File;
 use std::io::Write;
 use tracing::*;
 
-use crate::index::IndexWrapper;
 use crate::Result;
+use crate::index::IndexWrapper;
 
 use self::database::Database;
 

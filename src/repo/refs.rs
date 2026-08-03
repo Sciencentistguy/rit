@@ -1,4 +1,3 @@
-use std::fs::File;
 use std::io::Write;
 use std::str::FromStr;
 
@@ -7,11 +6,11 @@ use color_eyre::eyre::eyre;
 use tap::Tap;
 use tracing::trace;
 
+use crate::Result;
 use crate::digest::Digest;
 use crate::lockfile::Lockfile;
 use crate::repo::database::LoadedItem;
 use crate::revision::is_valid_ref_name;
-use crate::Result;
 
 impl super::Repo {
     /// Updates the value of HEAD to oid

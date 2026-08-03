@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    index::IndexEntry,
-    repo::{database::Database, Repo},
-    tree::Tree,
     Result,
+    index::IndexEntry,
+    repo::{Repo, database::Database},
+    tree::Tree,
 };
 
 use super::TreeEntry;

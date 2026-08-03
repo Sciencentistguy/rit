@@ -110,11 +110,36 @@ pub struct Opt {
     pub command: Command,
 
     /// How verbose the tracing output should be. Multiple flags increase verbosity. Note that this
-    /// is overeridden by the `RUST_LOG` environment variable.
+    /// is overridden by the `RUST_LOG` environment variable.
     #[clap(short, long, action(ArgAction::Count))]
     pub verbose: u8,
 
     /// The path to be used.
     #[clap(short)]
     pub path: Option<Utf8PathBuf>,
+
+    /// The author name
+    #[clap(long = "name", env = "RIT_AUTHOR_NAME")]
+    pub author_name: String,
+
+    /// The author email
+    #[clap(long = "email", env = "RIT_AUTHOR_EMAIL")]
+    pub author_email: String,
+}
+
+impl Opt {
+    #[cfg(test)]
+    pub fn test_values() -> Self {
+        use std::path::Path;
+
+        Self {
+            command: Command::Init {
+                branch_name: "".to_owned(),
+            },
+            verbose: 3,
+            path: Some(Path::new("/dev/null").to_owned().try_into().unwrap()),
+            author_name: "Jamie Quigley".to_owned(),
+            author_email: "jamie@quigley.xyz".to_owned(),
+        }
+    }
 }

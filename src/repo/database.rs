@@ -362,10 +362,7 @@ mod tests {
 
     use tempdir::TempDir;
 
-    use crate::{
-        repo::Repo,
-        test::{COMMIT_EMAIL, COMMIT_NAME},
-    };
+    use crate::repo::Repo;
 
     use super::*;
 
@@ -375,9 +372,6 @@ mod tests {
     /// Then load the tree and check that the name of the first entry is as expected.
     /// Load the blob from that file oid, and that should match the contents of the file (known)
     fn test_database_load() -> Result<()> {
-        std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
-        std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
-
         let root = TempDir::new("")?;
         let root = root.path();
         let root = Utf8Path::from_path(root).unwrap();

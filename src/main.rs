@@ -20,14 +20,14 @@ mod tree;
 mod util;
 
 use camino::Utf8PathBuf;
-use color_eyre::eyre::{eyre, Context};
 pub use color_eyre::Result;
+use color_eyre::eyre::{Context, eyre};
 use repo::diff::DiffMode;
 use repo::status::StatusOutputMode;
 use revision::Rev;
-use tracing::{info, Level};
-use tracing_subscriber::fmt::Subscriber;
+use tracing::{Level, info};
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::Subscriber;
 
 use crate::digest::Digest;
 use crate::interface::*;
@@ -36,7 +36,10 @@ use crate::repo::Repo;
 use clap::Parser;
 use once_cell::sync::Lazy;
 
+#[cfg(not(test))]
 static ARGS: Lazy<Opt> = Lazy::new(Opt::parse);
+#[cfg(test)]
+static ARGS: Lazy<Opt> = Lazy::new(Opt::test_values);
 
 fn main() -> Result<()> {
     color_eyre::install().unwrap();

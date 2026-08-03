@@ -2,10 +2,10 @@ use std::process::exit;
 
 use tracing::warn;
 
-use crate::interface::CatFile;
-use crate::repo::database::LoadedItem;
-use crate::repo::Repo;
 use crate::Result;
+use crate::interface::CatFile;
+use crate::repo::Repo;
+use crate::repo::database::LoadedItem;
 
 pub fn handle(repo: &mut Repo, args: &CatFile) -> Result<()> {
     #[allow(unused_variables)]

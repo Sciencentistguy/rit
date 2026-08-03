@@ -1,5 +1,4 @@
 use crate::repo::*;
-use crate::test::{COMMIT_EMAIL, COMMIT_NAME};
 use crate::*;
 
 use std::fs::Permissions;
@@ -49,14 +48,11 @@ fn commit() -> Result<()> {
     let dir_git = dir_git.path();
     let dir_git = Utf8Path::from_path(dir_git).unwrap();
 
-    std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
-    std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
-
     let git_command_args = [
         "-c",
-        &format!("user.name={}", COMMIT_NAME),
+        &format!("user.name={}", ARGS.author_name),
         "-c",
-        &format!("user.email={}", COMMIT_EMAIL),
+        &format!("user.email={}", ARGS.author_email),
         "-c",
         "commit.gpgsign=false",
     ];
@@ -164,14 +160,11 @@ pub(super) fn commit_file_hierarchy() -> Result<()> {
     let dir_git = dir_git.path();
     let dir_git = Utf8Path::from_path(dir_git).unwrap();
 
-    std::env::set_var("RIT_AUTHOR_NAME", COMMIT_NAME);
-    std::env::set_var("RIT_AUTHOR_EMAIL", COMMIT_EMAIL);
-
     let git_command_args = [
         "-c",
-        &format!("user.name={}", COMMIT_NAME),
+        &format!("user.name={}", ARGS.author_name),
         "-c",
-        &format!("user.email={}", COMMIT_EMAIL),
+        &format!("user.email={}", ARGS.author_email),
         "-c",
         "commit.gpgsign=false",
     ];

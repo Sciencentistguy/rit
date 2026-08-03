@@ -7,9 +7,6 @@ mod commit;
 mod init;
 mod status;
 
-pub const COMMIT_NAME: &str = "Jamie Quigley";
-pub const COMMIT_EMAIL: &str = "jamie@quigley.xyz";
-
 #[macro_export]
 macro_rules! test_file_contents {
     ($name:literal) => {

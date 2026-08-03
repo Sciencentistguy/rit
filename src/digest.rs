@@ -26,7 +26,7 @@ impl Digest {
     /// Hash the input bytes and return the resulting digest.
     pub fn new(bytes: &[u8]) -> Self {
         let mut hasher = Sha1::new();
-        hasher.update(&bytes);
+        hasher.update(bytes);
         let fin = hasher.finalize();
         debug_assert_eq!(fin.len(), 20);
         // Copy 20 bytes out of the GenericArray and transmute to `Self`

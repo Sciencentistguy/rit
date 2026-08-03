@@ -3,7 +3,7 @@ use std::mem::MaybeUninit;
 use std::os::unix::prelude::OsStrExt;
 
 use camino::{Utf8Path, Utf8PathBuf};
-use color_eyre::eyre::{eyre, Context};
+use color_eyre::eyre::{Context, eyre};
 use walkdir::WalkDir;
 
 use crate::*;

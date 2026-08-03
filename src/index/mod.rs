@@ -7,10 +7,10 @@ use bstr::ByteSlice;
 use camino::{Utf8Path, Utf8PathBuf};
 use tracing::trace;
 
+use crate::Result;
 use crate::digest::Digest;
 use crate::filemode::FileMode;
 use crate::util::Descends;
-use crate::Result;
 
 struct IndexHeader {
     magic: [u8; 4],
@@ -257,8 +257,8 @@ mod tests {
     use tempdir::TempDir;
 
     use super::{parse::*, write::*};
-    use crate::repo::Repo;
     use crate::Result;
+    use crate::repo::Repo;
 
     use pretty_assertions::assert_eq;
 
